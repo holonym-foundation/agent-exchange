@@ -1,0 +1,16 @@
+services:
+  agent:
+    build: .
+    env_file: .env
+    volumes:
+      # Persist the waap-cli session across container restarts so the agent
+      # doesn't need to log back in each time. Bind-mount this from the host
+      # if you want the same session shared with your local waap-cli.
+      # Path matches the non-root `node` user's home (Dockerfile uses USER node).
+      - waap-session:/home/node/.waap-cli
+      # Mount logs out so you can tail them from the host.
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  waap-session:

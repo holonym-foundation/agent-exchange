@@ -1,0 +1,48 @@
+# Cetus Yield Agent (Sui)
+# https://docs.wallet.human.tech/recipes/cetus-yield-agent
+
+# REQUIRED — Cetus pool object ID. Example below = SUI/USDC mainnet.
+CETUS_POOL_ID=0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105
+
+# Mode — `monitor` (Phase 1, read-only) or `active` (Phase 2+, real positions).
+# Always start in monitor mode. Switch to active only after you've watched it for a few cycles.
+AGENT_MODE=monitor
+
+# Strategy
+POSITION_RANGE_TICKS=200            # half-width of the position's tick range (used as fallback / minimum)
+REBALANCE_THRESHOLD_TICKS=100       # drift in ticks from position center before rebalancing
+CHECK_INTERVAL_MS=300000            # 5 minutes per recipe
+
+# Volatility-adaptive range (Phase 3) — agent widens position range during high volatility,
+# narrows during low volatility, to balance fee capture against rebalance frequency.
+VOLATILITY_WINDOW=60                # rolling cycles for std-dev calculation
+MIN_RANGE_TICKS=100
+MAX_RANGE_TICKS=400
+VOLATILITY_MULTIPLIER=3.0           # adaptive_range = volatility * multiplier * 2
+
+# Position sizing (active mode)
+USDC_OPEN_FRACTION=0.40             # fraction of USDC balance to deploy on initial open
+USDC_REOPEN_FRACTION=0.50           # fraction to deploy on each rebalance reopen
+
+# Network
+NETWORK=mainnet                     # or testnet
+# SUI_RPC=https://fullnode.mainnet.sui.io:443
+# USDC_TYPE=                        # override default Sui USDC coin type if needed
+
+# Optional safety rails
+# AGENT_MAX_DEPOSIT_USD=1000        # hard cap on deployed USD (skips rebalances/opens that exceed)
+ESTIMATED_GAS_SUI=0.01              # rough per-tx gas estimate for accumulating totalGasSpent
+
+# Yield scanner (Phases 4+5) — runs every Nth cycle, queries DeFi Llama for cross-protocol comparison
+YIELD_SCAN_INTERVAL=6               # every 6th cycle (~30 min at 5-min check interval)
+
+# Startup safety
+STARTUP_COOLDOWN_MS=60000           # wait 60s after start before opening new positions
+
+# Optional structured log file (JSON-line). Defaults to <projectName>.log in cwd.
+# LOG_FILE=./agent.log
+
+# Optional Matrix alerting on errors and rebalances
+# MATRIX_HOMESERVER=https://your.matrix.homeserver
+# MATRIX_ACCESS_TOKEN=
+# MATRIX_ALERT_ROOM=!roomid:matrix.org

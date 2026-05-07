@@ -1,0 +1,81 @@
+{
+  "slug": "cetus-yield-agent",
+  "name": "Cetus Yield Agent",
+  "description": "Autonomous concentrated-liquidity agent on Cetus Protocol (Sui). Phase 1 monitors pool prices read-only; Phase 2+ opens positions, earns trading fees, and auto-repositions when the price drifts out of range.",
+  "version": "0.2.0",
+  "author": "holonym-foundation",
+  "verified": true,
+  "chain": { "family": "sui", "id": 1, "name": "Sui Mainnet" },
+  "category": "yield",
+  "protocols": ["cetus"],
+  "tags": ["yield", "defi", "clmm", "sui"],
+  "runtimes": ["claude", "standalone", "openclaw", "nous"],
+  "envVars": [
+    {
+      "key": "CETUS_POOL_ID",
+      "required": true,
+      "description": "Cetus pool object ID (e.g. SUI/USDC: 0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105)"
+    },
+    {
+      "key": "AGENT_MODE",
+      "required": false,
+      "default": "monitor",
+      "description": "`monitor` (read-only, no funds at risk - Phase 1) or `active` (opens + rebalances real positions - Phase 2+)"
+    },
+    {
+      "key": "POSITION_RANGE_TICKS",
+      "required": false,
+      "default": "200",
+      "description": "Half-width of the position's tick range around the current tick"
+    },
+    {
+      "key": "REBALANCE_THRESHOLD_TICKS",
+      "required": false,
+      "default": "100",
+      "description": "Drift in ticks from position centre before triggering a rebalance"
+    },
+    {
+      "key": "CHECK_INTERVAL_MS",
+      "required": false,
+      "default": "300000",
+      "description": "Milliseconds between pool checks (default 5 minutes per recipe)"
+    },
+    {
+      "key": "NETWORK",
+      "required": false,
+      "default": "mainnet",
+      "description": "Sui network: `mainnet` or `testnet`"
+    },
+    {
+      "key": "SUI_RPC",
+      "required": false,
+      "description": "Sui RPC endpoint (defaults to @mysten/sui's fullnode for the chosen NETWORK)"
+    },
+    {
+      "key": "AGENT_MAX_DEPOSIT_USD",
+      "required": false,
+      "description": "Optional hard cap on USD deployed when opening a position; not in the canonical recipe but adds an extra ceiling"
+    },
+    {
+      "key": "LOG_FILE",
+      "required": false,
+      "description": "Optional path for a JSON-line log file (default: `<projectName>.log` in cwd)"
+    }
+  ],
+  "waapFeatures": ["send-tx", "policy"],
+  "recipeUrl": "https://docs.wallet.human.tech/recipes/cetus-yield-agent",
+  "minCliVersion": "0.0.1",
+  "eip8004": {
+    "supportedTrust": ["tee-attestation", "reputation"],
+    "x402Support": false,
+    "services": [
+      {
+        "type": "A2A",
+        "endpointTemplate": "https://{{host}}/a2a",
+        "version": "0.1",
+        "skills": ["yield-optimization", "cetus", "clmm"],
+        "domains": ["cetus.zone"]
+      }
+    ]
+  }
+}

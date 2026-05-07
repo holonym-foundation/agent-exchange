@@ -1,0 +1,18 @@
+# Cetus Yield Agent (Nous / Hermes runtime)
+# https://docs.wallet.human.tech/recipes/cetus-yield-agent
+
+# REQUIRED
+CETUS_POOL_ID=0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105
+
+# `monitor` (Phase 1, safe default) or `active` (Phase 2+).
+AGENT_MODE=monitor
+
+# Strategy
+POSITION_RANGE_TICKS=200
+REBALANCE_THRESHOLD_TICKS=100
+CHECK_INTERVAL_MS=300000
+NETWORK=mainnet
+
+# Optional
+# SUI_RPC=https://fullnode.mainnet.sui.io:443
+# AGENT_MAX_DEPOSIT_USD=1000
