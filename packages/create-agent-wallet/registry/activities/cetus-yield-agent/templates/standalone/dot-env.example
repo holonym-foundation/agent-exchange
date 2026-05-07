@@ -33,6 +33,11 @@ NETWORK=mainnet                     # or testnet
 # AGENT_MAX_DEPOSIT_USD=1000        # hard cap on deployed USD (skips rebalances/opens that exceed)
 ESTIMATED_GAS_SUI=0.01              # rough per-tx gas estimate for accumulating totalGasSpent
 
+# Optional — bypass `waap-cli whoami` on startup. Set to the agent's Sui wallet
+# address when the host doesn't maintain an interactive waap-cli session
+# (credentials in env, transactions sent stateless via `waap-cli send-tx`).
+# WAAP_AGENT_ADDRESS=0x...
+
 # Yield scanner (Phases 4+5) — runs every Nth cycle, queries DeFi Llama for cross-protocol comparison
 YIELD_SCAN_INTERVAL=6               # every 6th cycle (~30 min at 5-min check interval)
 

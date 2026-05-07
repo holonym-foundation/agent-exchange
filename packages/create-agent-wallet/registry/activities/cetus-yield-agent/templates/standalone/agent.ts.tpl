@@ -112,10 +112,18 @@ function parseWaapJson<T>(stdout: string): T {
 }
 
 async function whoami(): Promise<string> {
+  // Allow operators to skip the whoami session check by setting
+  // WAAP_AGENT_ADDRESS in env. Useful when the agent is deployed alongside a
+  // long-running waap-cli session (e.g. credentials in env, no interactive
+  // login) — `whoami --json` requires an active session that the agent
+  // wouldn't normally maintain.
+  const override = process.env.WAAP_AGENT_ADDRESS?.trim()
+  if (override) return override
+
   const { stdout } = await execa('waap-cli', ['whoami', '--json'])
   const parsed = parseWaapJson<{ suiWalletAddress?: string }>(stdout)
   if (!parsed.suiWalletAddress) {
-    throw new Error('no Sui wallet address — run `waap-cli signup` first')
+    throw new Error('no Sui wallet address — set WAAP_AGENT_ADDRESS or run `waap-cli signup`')
   }
   return parsed.suiWalletAddress
 }
