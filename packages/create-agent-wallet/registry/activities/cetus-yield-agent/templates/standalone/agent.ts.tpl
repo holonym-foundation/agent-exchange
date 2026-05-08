@@ -703,6 +703,7 @@ async function main(): Promise<void> {
   // Phase 1 (monitor) is read-only — no signup needed. Resolve the WaaP wallet
   // address only when active mode will submit transactions.
   const owner = AGENT_MODE === 'active' ? await whoami() : null
+  if (owner) cetus.senderAddress = owner
 
   log('info', 'agent_starting', {
     mode: AGENT_MODE,
