@@ -47,6 +47,13 @@ STARTUP_COOLDOWN_MS=60000           # wait 60s after start before opening new po
 # Optional structured log file (JSON-line). Defaults to <projectName>.log in cwd.
 # LOG_FILE=./agent.log
 
+# Watchdog / supervisor integration. The agent writes its PID on startup so an
+# external supervisor (systemd, monit, a bash watchdog) can detect liveness and
+# restart on crash. Defaults to enabled to match the reference deployment
+# pattern. Set to false for local dev if you find stale .pid files annoying.
+# WRITE_PID_FILE=true
+# PID_FILE=./agent.pid
+
 # Optional Matrix alerting on errors and rebalances
 # MATRIX_HOMESERVER=https://your.matrix.homeserver
 # MATRIX_ACCESS_TOKEN=
