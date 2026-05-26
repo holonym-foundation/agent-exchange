@@ -4,6 +4,16 @@ import { SuiClient, getFullnodeUrl } from '@mysten/sui/client'
 import { initCetusSDK, ClmmPoolUtil } from '@cetusprotocol/cetus-sui-clmm-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
+import path from 'node:path'
+
+// -----------------------------------------------------------------------------
+// Source of truth — this template is the canonical form of the cetus yield
+// agent. It is rendered into the live deployment on the reference deployment by
+// the deployment workflow. The JS→TS migration of the
+// dogfood completed on 2026-05-07; the live host runs the rendered output of
+// this file (agent.ts under tsx), with no separate JS variant to keep in sync.
+// See the runtime documentation for deployment topology.
+// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // Config — see https://docs.wallet.human.tech/recipes/cetus-yield-agent
@@ -34,6 +44,14 @@ const YIELD_SCAN_INTERVAL = Number(process.env.YIELD_SCAN_INTERVAL ?? 6) // ever
 const USDC_OPEN_FRACTION = Number(process.env.USDC_OPEN_FRACTION ?? 0.40)
 const USDC_REOPEN_FRACTION = Number(process.env.USDC_REOPEN_FRACTION ?? 0.50)
 const ESTIMATED_GAS_SUI = Number(process.env.ESTIMATED_GAS_SUI ?? 0.01)
+
+// Watchdog integration — writes a PID file on startup so external supervisors
+// (systemd Type=simple + a tailer, or a bash watchdog) can detect liveness.
+// Defaults to enabled to match the dogfood deployment pattern. Set
+// WRITE_PID_FILE=false to opt out (e.g. local dev where stale .pid files
+// during crashes are annoying).
+const WRITE_PID_FILE = (process.env.WRITE_PID_FILE ?? 'true').toLowerCase() !== 'false'
+const PID_FILE = process.env.PID_FILE ?? path.join(process.cwd(), 'agent.pid')
 
 if (!POOL_ID) {
   console.error(`[${AGENT_ID}] CETUS_POOL_ID is required`)
@@ -718,6 +736,18 @@ async function main(): Promise<void> {
     maxRangeTicks: MAX_RANGE_TICKS,
     maxDepositUsd: MAX_DEPOSIT_USD ?? null,
   })
+
+  // Write PID file before installing signal handlers so a supervisor that
+  // SIGTERMs us early during startup still sees us as alive.
+  if (WRITE_PID_FILE) {
+    try {
+      fs.writeFileSync(PID_FILE, String(process.pid))
+      process.on('exit', () => { try { fs.unlinkSync(PID_FILE) } catch {} })
+      log('info', 'pid_file_written', { path: PID_FILE, pid: process.pid })
+    } catch (err) {
+      log('warn', 'pid_file_write_failed', { path: PID_FILE, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
 
   for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     process.on(sig, () => {
