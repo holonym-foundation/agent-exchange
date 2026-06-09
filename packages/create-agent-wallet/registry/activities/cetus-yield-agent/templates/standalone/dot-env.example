@@ -27,7 +27,26 @@ USDC_REOPEN_FRACTION=0.50           # fraction to deploy on each rebalance reope
 # Network
 NETWORK=mainnet                     # or testnet
 # SUI_RPC=https://fullnode.mainnet.sui.io:443
+# SUI_GRPC_URL=https://fullnode.mainnet.sui.io:443
 # USDC_TYPE=                        # override default Sui USDC coin type if needed
+
+# Dry-run safety — when true, every tx is simulated via the Sui gRPC
+# `dryRunTransaction` endpoint (mapped to `simulateTransaction` in the v2
+# SDK) instead of submitted via waap-cli. Effects, gas, and balance changes
+# are logged so operators can verify a planned action before flipping back
+# to live submission. Active mode + DRY_RUN=true is the recommended path
+# for first-run validation of a new pool.
+# DRY_RUN=false
+
+# Volatility-adaptive strategy floor — minimum tick samples required before
+# the adaptive half-width kicks in. Below this, decideRange() falls back to
+# POSITION_RANGE_TICKS. Raise to require a longer warm-up.
+# MIN_SAMPLES_FOR_ADAPTIVE=10
+
+# Rebalance intent file — written before each on-chain step of a rebalance
+# (remove → open) and reconciled at startup. Lets the agent refuse to
+# auto-recover from a crash that happened between remove and open.
+# INTENT_FILE=./agent.intent.json
 
 # Optional safety rails
 # AGENT_MAX_DEPOSIT_USD=1000        # hard cap on deployed USD (skips rebalances/opens that exceed)

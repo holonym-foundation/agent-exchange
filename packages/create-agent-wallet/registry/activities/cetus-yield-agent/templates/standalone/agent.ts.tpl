@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { execa } from 'execa'
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client'
+import { SuiGrpcClient } from '@mysten/sui/grpc'
 import { initCetusSDK, ClmmPoolUtil } from '@cetusprotocol/cetus-sui-clmm-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
@@ -34,6 +35,14 @@ const REBALANCE_THRESHOLD = Number(process.env.REBALANCE_THRESHOLD_TICKS ?? 100)
 const CHECK_INTERVAL = Number(process.env.CHECK_INTERVAL_MS ?? 5 * 60 * 1000)
 const NETWORK = (process.env.NETWORK ?? 'mainnet') as 'mainnet' | 'testnet'
 const SUI_RPC = process.env.SUI_RPC ?? getFullnodeUrl(NETWORK)
+// Public gRPC endpoint used for transaction simulation in DRY_RUN. Same host
+// as the JSON-RPC fullnode; the gRPC service is exposed on the same TLS port.
+const SUI_GRPC_URL = process.env.SUI_GRPC_URL ?? (
+  NETWORK === 'mainnet'
+    ? 'https://fullnode.mainnet.sui.io:443'
+    : 'https://fullnode.testnet.sui.io:443'
+)
+const DRY_RUN = (process.env.DRY_RUN ?? 'false').toLowerCase() === 'true'
 const LOG_FILE = process.env.LOG_FILE ?? `${AGENT_ID}.log`
 const MAX_DEPOSIT_USD = process.env.AGENT_MAX_DEPOSIT_USD
   ? Number(process.env.AGENT_MAX_DEPOSIT_USD)
@@ -176,7 +185,18 @@ interface WaapSendTxResult {
   digest?: string
 }
 
-async function signAndSendTx(b64TxBytes: string): Promise<string | null> {
+const DRY_RUN_DIGEST = 'DRY_RUN'
+
+async function signAndSendTx(b64TxBytes: string, label = 'send_tx'): Promise<string | null> {
+  if (DRY_RUN) {
+    // In dry-run we simulate via gRPC instead of submitting. The sentinel
+    // digest signals the rest of the flow to short-circuit finality waits
+    // and continue (balances/positions stay as the on-chain real values,
+    // so a subsequent simulated open uses pre-remove balances — accept that
+    // imprecision in exchange for an end-to-end dry-run pass).
+    await simulateTx(b64TxBytes, label)
+    return DRY_RUN_DIGEST
+  }
   const { stdout } = await execa(
     'waap-cli',
     ['send-tx', '--tx-bytes', b64TxBytes, '--chain', `sui:${NETWORK}`, '--json'],
@@ -188,6 +208,40 @@ async function signAndSendTx(b64TxBytes: string): Promise<string | null> {
   } catch {
     const m = stdout.match(/(?:Transaction submitted|TxHash|digest):\s*(\S+)/i)
     return m ? m[1] : null
+  }
+}
+
+// Simulate the tx via the gRPC client and log effects + gas. Never throws —
+// dry-run is an observation tool; any error is reported and the caller
+// treats the submission as a no-op (returns null from signAndSendTx).
+async function simulateTx(b64TxBytes: string, label: string): Promise<void> {
+  try {
+    const bytes = Buffer.from(b64TxBytes, 'base64')
+    const grpc = getGrpc()
+    // In v2 of @mysten/sui this is `grpc.core.simulateTransaction`; see the
+    // comment on getGrpc() for why we use the v1 name here.
+    const res = await grpc.core.dryRunTransaction({ transaction: bytes })
+    const tx = res.transaction
+    const success = tx.effects?.status?.success === true
+    const error = tx.effects?.status?.success === false ? tx.effects.status.error : null
+    const gas = tx.effects?.gasUsed
+    logEvent('dry_run_simulated', {
+      label,
+      success,
+      error,
+      gas,
+      balanceChanges: tx.balanceChanges,
+    })
+    if (success) {
+      log('info', 'dry_run_ok', { label, gas })
+    } else {
+      log('warn', 'dry_run_would_fail', { label, error })
+    }
+  } catch (err) {
+    log('error', 'dry_run_simulate_failed', {
+      label,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -205,6 +259,9 @@ async function waitForFinality(
   digest: string | null,
   label: string,
 ): Promise<FinalityResult> {
+  if (digest === DRY_RUN_DIGEST) {
+    return { success: true, status: 'dry_run' }
+  }
   if (!digest) {
     log('warn', 'no_digest_to_wait_on', { label })
     return { success: false, status: 'no_digest' }
@@ -236,6 +293,23 @@ async function waitForFinality(
 
 const sui = new SuiClient({ url: SUI_RPC })
 const cetus = initCetusSDK({ network: NETWORK })
+
+// gRPC client used for transaction simulation. Lazy so non-DRY_RUN agents
+// don't connect to the gRPC endpoint at all.
+//
+// Note on the method name: this calls `core.dryRunTransaction` from
+// @mysten/sui v1.x's gRPC client — the same wire-level Sui gRPC service
+// that v2 of the SDK exposes as `core.simulateTransaction`. The agent stays
+// on v1.x because @cetusprotocol/cetus-sui-clmm-sdk@^5.4.0 still imports
+// the legacy `SuiClient` symbol that v2 dropped. When Cetus ships a
+// v2-compatible SDK, rename the call below to `simulateTransaction`.
+let _grpc: SuiGrpcClient | null = null
+function getGrpc(): SuiGrpcClient {
+  if (!_grpc) {
+    _grpc = new SuiGrpcClient({ network: NETWORK, baseUrl: SUI_GRPC_URL })
+  }
+  return _grpc
+}
 
 // -----------------------------------------------------------------------------
 // State (in-memory; per-process)
@@ -473,7 +547,7 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   })
   removeTx.setSender(owner)
   const removeBytes = Buffer.from(await removeTx.build({ client: sui })).toString('base64')
-  const removeTxHash = await signAndSendTx(removeBytes)
+  const removeTxHash = await signAndSendTx(removeBytes, 'remove_liquidity')
 
   // Wait for remove to reach finality before reading balances or opening a
   // replacement position — otherwise the agent could re-open with stale
@@ -627,7 +701,7 @@ async function openLiquidityFromDecision(
   } as unknown as Parameters<typeof cetus.Position.createAddLiquidityPayload>[0])
   openPayload.setSender(owner)
   const openBytes = Buffer.from(await openPayload.build({ client: sui })).toString('base64')
-  const openTxHash = await signAndSendTx(openBytes)
+  const openTxHash = await signAndSendTx(openBytes, 'open_position')
   const openFinality = await waitForFinality(openTxHash, 'open_position')
   if (!openFinality.success) {
     logEvent('open_position_failed', {

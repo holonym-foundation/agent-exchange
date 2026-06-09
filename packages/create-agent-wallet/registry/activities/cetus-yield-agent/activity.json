@@ -57,6 +57,17 @@
       "description": "Optional hard cap on USD deployed when opening a position; not in the canonical recipe but adds an extra ceiling"
     },
     {
+      "key": "DRY_RUN",
+      "required": false,
+      "default": "false",
+      "description": "If `true`, simulate every tx via Sui gRPC instead of submitting via waap-cli. Logs effects + gas so operators can verify a planned action before going live."
+    },
+    {
+      "key": "INTENT_FILE",
+      "required": false,
+      "description": "Path to the rebalance intent file used for crash-recovery reconciliation (default: `<projectName>.intent.json` in cwd)"
+    },
+    {
       "key": "LOG_FILE",
       "required": false,
       "description": "Optional path for a JSON-line log file (default: `<projectName>.log` in cwd)"
