@@ -67,6 +67,8 @@ const STRATEGY_CONFIG: RangeStrategyConfig = {
   reopenFraction: USDC_REOPEN_FRACTION,
 }
 
+const INTENT_FILE = process.env.INTENT_FILE ?? `${AGENT_ID}.intent.json`
+
 // Watchdog integration — writes a PID file on startup so external supervisors
 // (systemd Type=simple + a tailer, or a bash watchdog) can detect liveness.
 // Defaults to enabled to match the dogfood deployment pattern. Set
@@ -189,6 +191,45 @@ async function signAndSendTx(b64TxBytes: string): Promise<string | null> {
   }
 }
 
+// Wait for a submitted tx to reach finality and verify it succeeded on-chain.
+// `signAndSendTx` only proves the tx was submitted — without this check the
+// agent would proceed to the next step (e.g. reopen after a failed remove)
+// based on stale assumptions about chain state.
+interface FinalityResult {
+  success: boolean
+  status: string
+  error?: string
+}
+
+async function waitForFinality(
+  digest: string | null,
+  label: string,
+): Promise<FinalityResult> {
+  if (!digest) {
+    log('warn', 'no_digest_to_wait_on', { label })
+    return { success: false, status: 'no_digest' }
+  }
+  try {
+    const result = await sui.waitForTransaction({
+      digest,
+      options: { showEffects: true },
+      timeout: 60_000,
+    })
+    const status = result.effects?.status?.status ?? 'unknown'
+    const error = result.effects?.status?.error
+    if (status !== 'success') {
+      log('error', 'tx_failed_on_chain', { label, digest, status, error })
+      return { success: false, status, error }
+    }
+    log('info', 'tx_finalized', { label, digest })
+    return { success: true, status }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log('error', 'wait_for_tx_failed', { label, digest, error: msg })
+    return { success: false, status: 'wait_error', error: msg }
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Sui + Cetus clients
 // -----------------------------------------------------------------------------
@@ -288,6 +329,100 @@ async function getPositions(owner: string): Promise<Position[]> {
 }
 
 // -----------------------------------------------------------------------------
+// Rebalance intent — crash-recovery for the multi-step rebalance flow.
+//
+// A rebalance is two on-chain steps (remove → open). If the agent crashes
+// between them, on restart the active-mode loop would see "no positions"
+// and call openInitialPosition with the configured open fraction applied
+// to the full post-remove balance — depositing far more capital than was
+// originally in the position. Writing an intent file before each step and
+// reconciling it on startup blocks that.
+// -----------------------------------------------------------------------------
+
+type IntentPhase = 'remove_pending' | 'open_pending' | 'initial_open_pending'
+
+interface RebalanceIntent {
+  phase: IntentPhase
+  ts: string
+  trigger: 'rebalance' | 'initial'
+  originalPosId?: string
+  removeTxHash?: string
+  plannedTickLower?: number
+  plannedTickUpper?: number
+  plannedSizingFraction?: number
+}
+
+function writeIntent(intent: RebalanceIntent): void {
+  try {
+    fs.writeFileSync(INTENT_FILE, JSON.stringify(intent, null, 2))
+    log('info', 'intent_written', intent as unknown as Record<string, unknown>)
+  } catch (err) {
+    log('warn', 'intent_write_failed', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+function readIntent(): RebalanceIntent | null {
+  try {
+    if (!fs.existsSync(INTENT_FILE)) return null
+    return JSON.parse(fs.readFileSync(INTENT_FILE, 'utf8')) as RebalanceIntent
+  } catch (err) {
+    log('warn', 'intent_read_failed', { error: err instanceof Error ? err.message : String(err) })
+    return null
+  }
+}
+
+function clearIntent(): void {
+  try {
+    if (fs.existsSync(INTENT_FILE)) fs.unlinkSync(INTENT_FILE)
+  } catch {}
+}
+
+// Called once at startup before entering the main loop. Three outcomes:
+//   - no intent / safe-to-clear intent → noop
+//   - open_pending + position now live  → clear; the open succeeded
+//   - open_pending + no live position   → REFUSE to continue; alert operator.
+//     Auto-replaying the open would risk depositing wildly different capital
+//     than originally planned (full balance × open fraction vs the planned
+//     fraction of pre-remove balance).
+async function reconcileIntent(owner: string): Promise<void> {
+  const intent = readIntent()
+  if (!intent) return
+  const positions = await getPositions(owner)
+  logEvent('intent_reconcile_start', {
+    intent: intent as unknown as Record<string, unknown>,
+    livePositions: positions.length,
+  })
+
+  if (intent.phase === 'remove_pending') {
+    // The remove either landed (no position) or never did (still there).
+    // Both are safe for the normal loop to resume from.
+    clearIntent()
+    logEvent('intent_reconcile_done', {
+      resolution: 'remove_pending_cleared',
+      livePositions: positions.length,
+    })
+    return
+  }
+
+  if (positions.length > 0) {
+    clearIntent()
+    logEvent('intent_reconcile_done', {
+      resolution: 'open_succeeded',
+      livePositions: positions.length,
+    })
+    return
+  }
+
+  // open_pending or initial_open_pending with no live position — refuse to
+  // auto-recover. Surface to the operator and exit non-zero so a supervisor
+  // (or a human reading the alert) decides what to do.
+  const critical = `crashed mid-open: intent=${intent.phase}, no live position. Inspect ${INTENT_FILE} and reconcile manually.`
+  log('error', 'intent_reconcile_critical', { message: critical, intent: intent as unknown as Record<string, unknown> })
+  await sendMatrixAlert(`CRITICAL: ${critical}`)
+  process.exit(2)
+}
+
+// -----------------------------------------------------------------------------
 // Rebalance logic (active mode) — range/sizing decisions live in strategy.ts
 // -----------------------------------------------------------------------------
 
@@ -314,6 +449,15 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   const balanceBefore = await getSuiBalance(owner)
   const usdcBefore = await getUsdcBalance(owner)
 
+  // Intent before remove — so a crash here is reconciled as a benign
+  // "either it landed or it didn't, just resume" on restart.
+  writeIntent({
+    phase: 'remove_pending',
+    trigger: 'rebalance',
+    ts: new Date().toISOString(),
+    originalPosId: position.posId,
+  })
+
   // Step 1 — remove liquidity + collect fees
   log('info', 'removing_liquidity', { posId: position.posId })
   const removeTx = await cetus.Position.removeLiquidityTransactionPayload({
@@ -331,8 +475,19 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   const removeBytes = Buffer.from(await removeTx.build({ client: sui })).toString('base64')
   const removeTxHash = await signAndSendTx(removeBytes)
 
-  // Wait for state to settle
-  await new Promise((r) => setTimeout(r, 5000))
+  // Wait for remove to reach finality before reading balances or opening a
+  // replacement position — otherwise the agent could re-open with stale
+  // (pre-remove) balances or on top of a remove that silently reverted.
+  const removeFinality = await waitForFinality(removeTxHash, 'remove_liquidity')
+  if (!removeFinality.success) {
+    logEvent('rebalance_aborted', {
+      reason: 'remove_failed',
+      txHash: removeTxHash,
+      status: removeFinality.status,
+      error: removeFinality.error,
+    })
+    return
+  }
 
   const balanceAfterRemove = await getSuiBalance(owner)
   const usdcAfterRemove = await getUsdcBalance(owner)
@@ -357,6 +512,19 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     config: STRATEGY_CONFIG,
   })
 
+  // Promote the intent before submitting open. A crash here is the
+  // dangerous case — operator-only reconciliation on restart.
+  writeIntent({
+    phase: 'open_pending',
+    trigger: 'rebalance',
+    ts: new Date().toISOString(),
+    originalPosId: position.posId,
+    removeTxHash: removeTxHash ?? undefined,
+    plannedTickLower: decision.tickLower,
+    plannedTickUpper: decision.tickUpper,
+    plannedSizingFraction: decision.sizingFraction,
+  })
+
   log('info', 'opening_new_position', {
     tickLower: decision.tickLower,
     tickUpper: decision.tickUpper,
@@ -374,6 +542,7 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     capExceededLogMessage: 'usdc_exceeds_max_deposit_cap',
   })
   if (!openTxHash) return
+  clearIntent()
 
   rebalanceCount++
   positionOpenedAt = new Date().toISOString()
@@ -458,7 +627,17 @@ async function openLiquidityFromDecision(
   } as unknown as Parameters<typeof cetus.Position.createAddLiquidityPayload>[0])
   openPayload.setSender(owner)
   const openBytes = Buffer.from(await openPayload.build({ client: sui })).toString('base64')
-  return signAndSendTx(openBytes)
+  const openTxHash = await signAndSendTx(openBytes)
+  const openFinality = await waitForFinality(openTxHash, 'open_position')
+  if (!openFinality.success) {
+    logEvent('open_position_failed', {
+      txHash: openTxHash,
+      status: openFinality.status,
+      error: openFinality.error,
+    })
+    return null
+  }
+  return openTxHash
 }
 
 async function openInitialPosition(owner: string, pool: PoolState): Promise<void> {
@@ -481,6 +660,18 @@ async function openInitialPosition(owner: string, pool: PoolState): Promise<void
     reason: decision.reason,
   })
 
+  // Initial open also benefits from intent tracking — if the tx submits
+  // but the agent crashes before clearing, the next startup must NOT loop
+  // back here and open a second position with the same fraction-of-balance.
+  writeIntent({
+    phase: 'initial_open_pending',
+    trigger: 'initial',
+    ts: new Date().toISOString(),
+    plannedTickLower: decision.tickLower,
+    plannedTickUpper: decision.tickUpper,
+    plannedSizingFraction: decision.sizingFraction,
+  })
+
   const txHash = await openLiquidityFromDecision({
     owner,
     pool,
@@ -489,7 +680,11 @@ async function openInitialPosition(owner: string, pool: PoolState): Promise<void
     insufficientLogMessage: 'insufficient_usdc_to_open',
     capExceededLogMessage: 'usdc_exceeds_max_deposit_cap_initial',
   })
-  if (!txHash) return
+  if (!txHash) {
+    clearIntent()
+    return
+  }
+  clearIntent()
 
   positionOpenedAt = new Date().toISOString()
   totalGasSpent += ESTIMATED_GAS_SUI
@@ -795,6 +990,10 @@ async function main(): Promise<void> {
       stopping = true
     })
   }
+
+  // Reconcile any leftover intent from a prior crash before doing anything
+  // that could compound the inconsistency. Only meaningful in active mode.
+  if (owner) await reconcileIntent(owner)
 
   // Initial yield scan happens before the main loop so the dashboard has data.
   await scanYields()
