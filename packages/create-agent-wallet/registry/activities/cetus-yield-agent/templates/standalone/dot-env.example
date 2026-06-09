@@ -26,16 +26,20 @@ USDC_REOPEN_FRACTION=0.50           # fraction to deploy on each rebalance reope
 
 # Network
 NETWORK=mainnet                     # or testnet
+# Optional override of the Sui gRPC endpoint used for ALL chain access
+# (reads, finality waits, simulation). When unset, the cetus SDK uses its
+# built-in mainnet/testnet defaults. Both SUI_RPC and SUI_GRPC_URL are
+# accepted — SUI_RPC takes precedence so existing operator configs keep
+# working when the agent migrated from JSON-RPC to gRPC.
 # SUI_RPC=https://fullnode.mainnet.sui.io:443
 # SUI_GRPC_URL=https://fullnode.mainnet.sui.io:443
 # USDC_TYPE=                        # override default Sui USDC coin type if needed
 
-# Dry-run safety — when true, every tx is simulated via the Sui gRPC
-# `dryRunTransaction` endpoint (mapped to `simulateTransaction` in the v2
-# SDK) instead of submitted via waap-cli. Effects, gas, and balance changes
-# are logged so operators can verify a planned action before flipping back
-# to live submission. Active mode + DRY_RUN=true is the recommended path
-# for first-run validation of a new pool.
+# Dry-run safety — when true, every tx is simulated via the v2 Sui gRPC
+# `simulateTransaction` endpoint instead of submitted via waap-cli.
+# Effects, gas, and balance changes are logged so operators can verify a
+# planned action before flipping back to live submission. Active mode +
+# DRY_RUN=true is the recommended path for first-run validation of a new pool.
 # DRY_RUN=false
 
 # Volatility-adaptive strategy floor — minimum tick samples required before

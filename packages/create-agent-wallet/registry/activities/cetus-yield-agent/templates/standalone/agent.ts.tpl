@@ -1,8 +1,8 @@
 import 'dotenv/config'
 import { execa } from 'execa'
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client'
-import { SuiGrpcClient } from '@mysten/sui/grpc'
-import { initCetusSDK, ClmmPoolUtil } from '@cetusprotocol/cetus-sui-clmm-sdk'
+import { Transaction } from '@mysten/sui/transactions'
+import { CetusClmmSDK } from '@cetusprotocol/sui-clmm-sdk'
+import { ClmmPoolUtil } from '@cetusprotocol/common-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -34,14 +34,11 @@ const POSITION_RANGE = Number(process.env.POSITION_RANGE_TICKS ?? 200)
 const REBALANCE_THRESHOLD = Number(process.env.REBALANCE_THRESHOLD_TICKS ?? 100)
 const CHECK_INTERVAL = Number(process.env.CHECK_INTERVAL_MS ?? 5 * 60 * 1000)
 const NETWORK = (process.env.NETWORK ?? 'mainnet') as 'mainnet' | 'testnet'
-const SUI_RPC = process.env.SUI_RPC ?? getFullnodeUrl(NETWORK)
-// Public gRPC endpoint used for transaction simulation in DRY_RUN. Same host
-// as the JSON-RPC fullnode; the gRPC service is exposed on the same TLS port.
-const SUI_GRPC_URL = process.env.SUI_GRPC_URL ?? (
-  NETWORK === 'mainnet'
-    ? 'https://fullnode.mainnet.sui.io:443'
-    : 'https://fullnode.testnet.sui.io:443'
-)
+// Optional override of the Sui gRPC endpoint used for ALL chain access (reads,
+// finality waits, simulation). When unset, the cetus SDK uses its built-in
+// mainnet/testnet defaults. Both legacy SUI_RPC and SUI_GRPC_URL env vars are
+// honored — SUI_RPC takes precedence so existing operator configs keep working.
+const SUI_GRPC_URL = process.env.SUI_RPC ?? process.env.SUI_GRPC_URL
 const DRY_RUN = (process.env.DRY_RUN ?? 'false').toLowerCase() === 'true'
 const LOG_FILE = process.env.LOG_FILE ?? `${AGENT_ID}.log`
 const MAX_DEPOSIT_USD = process.env.AGENT_MAX_DEPOSIT_USD
@@ -187,16 +184,28 @@ interface WaapSendTxResult {
 
 const DRY_RUN_DIGEST = 'DRY_RUN'
 
-async function signAndSendTx(b64TxBytes: string, label = 'send_tx'): Promise<string | null> {
+function stringifyExecutionError(err: unknown): string {
+  if (err == null) return 'unknown'
+  if (typeof err === 'string') return err
+  if (typeof err === 'object') {
+    const msg = (err as { message?: unknown }).message
+    if (typeof msg === 'string') return msg
+    try { return JSON.stringify(err) } catch { return String(err) }
+  }
+  return String(err)
+}
+
+async function signAndSendTx(tx: Transaction, label = 'send_tx'): Promise<string | null> {
   if (DRY_RUN) {
     // In dry-run we simulate via gRPC instead of submitting. The sentinel
     // digest signals the rest of the flow to short-circuit finality waits
     // and continue (balances/positions stay as the on-chain real values,
     // so a subsequent simulated open uses pre-remove balances — accept that
     // imprecision in exchange for an end-to-end dry-run pass).
-    await simulateTx(b64TxBytes, label)
+    await simulateTx(tx, label)
     return DRY_RUN_DIGEST
   }
+  const b64TxBytes = Buffer.from(await tx.build({ client: chain })).toString('base64')
   const { stdout } = await execa(
     'waap-cli',
     ['send-tx', '--tx-bytes', b64TxBytes, '--chain', `sui:${NETWORK}`, '--json'],
@@ -211,26 +220,27 @@ async function signAndSendTx(b64TxBytes: string, label = 'send_tx'): Promise<str
   }
 }
 
-// Simulate the tx via the gRPC client and log effects + gas. Never throws —
+// Simulate the tx via the v2 gRPC client and log effects + gas. Never throws —
 // dry-run is an observation tool; any error is reported and the caller
-// treats the submission as a no-op (returns null from signAndSendTx).
-async function simulateTx(b64TxBytes: string, label: string): Promise<void> {
+// treats the submission as a no-op (returns DRY_RUN_DIGEST from signAndSendTx).
+async function simulateTx(tx: Transaction, label: string): Promise<void> {
   try {
-    const bytes = Buffer.from(b64TxBytes, 'base64')
-    const grpc = getGrpc()
-    // In v2 of @mysten/sui this is `grpc.core.simulateTransaction`; see the
-    // comment on getGrpc() for why we use the v1 name here.
-    const res = await grpc.core.dryRunTransaction({ transaction: bytes })
-    const tx = res.transaction
-    const success = tx.effects?.status?.success === true
-    const error = tx.effects?.status?.success === false ? tx.effects.status.error : null
-    const gas = tx.effects?.gasUsed
+    const res = await chain.simulateTransaction({
+      transaction: tx,
+      checksEnabled: true,
+      include: { effects: true, balanceChanges: true, events: true },
+    })
+    const inner = res.$kind === 'Transaction' ? res.Transaction : res.FailedTransaction
+    const status = inner.status
+    const success = status.success === true
+    const error = status.success === false ? stringifyExecutionError(status.error) : null
+    const gas = inner.effects?.gasUsed
     logEvent('dry_run_simulated', {
       label,
       success,
       error,
       gas,
-      balanceChanges: tx.balanceChanges,
+      balanceChanges: inner.balanceChanges,
     })
     if (success) {
       log('info', 'dry_run_ok', { label, gas })
@@ -267,19 +277,22 @@ async function waitForFinality(
     return { success: false, status: 'no_digest' }
   }
   try {
-    const result = await sui.waitForTransaction({
+    const result = await chain.waitForTransaction({
       digest,
-      options: { showEffects: true },
+      include: { effects: true },
       timeout: 60_000,
     })
-    const status = result.effects?.status?.status ?? 'unknown'
-    const error = result.effects?.status?.error
-    if (status !== 'success') {
-      log('error', 'tx_failed_on_chain', { label, digest, status, error })
-      return { success: false, status, error }
+    const inner = result.$kind === 'Transaction' ? result.Transaction : result.FailedTransaction
+    const status = inner.status
+    if (status.success !== true) {
+      // status.error is a discriminated union (string | structured Move
+      // abort); flatten to a string for logging + the FinalityResult type.
+      const error = status.success === false ? stringifyExecutionError(status.error) : 'unknown_status'
+      log('error', 'tx_failed_on_chain', { label, digest, error })
+      return { success: false, status: 'failure', error }
     }
     log('info', 'tx_finalized', { label, digest })
-    return { success: true, status }
+    return { success: true, status: 'success' }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     log('error', 'wait_for_tx_failed', { label, digest, error: msg })
@@ -291,25 +304,11 @@ async function waitForFinality(
 // Sui + Cetus clients
 // -----------------------------------------------------------------------------
 
-const sui = new SuiClient({ url: SUI_RPC })
-const cetus = initCetusSDK({ network: NETWORK })
-
-// gRPC client used for transaction simulation. Lazy so non-DRY_RUN agents
-// don't connect to the gRPC endpoint at all.
-//
-// Note on the method name: this calls `core.dryRunTransaction` from
-// @mysten/sui v1.x's gRPC client — the same wire-level Sui gRPC service
-// that v2 of the SDK exposes as `core.simulateTransaction`. The agent stays
-// on v1.x because @cetusprotocol/cetus-sui-clmm-sdk@^5.4.0 still imports
-// the legacy `SuiClient` symbol that v2 dropped. When Cetus ships a
-// v2-compatible SDK, rename the call below to `simulateTransaction`.
-let _grpc: SuiGrpcClient | null = null
-function getGrpc(): SuiGrpcClient {
-  if (!_grpc) {
-    _grpc = new SuiGrpcClient({ network: NETWORK, baseUrl: SUI_GRPC_URL })
-  }
-  return _grpc
-}
+// One SDK, one client — `cetus.FullClient` is a SuiGrpcClient + ExtendedSuiClient,
+// so reads (getBalance, getPositionList), waits (waitForTransaction), and
+// dry-run simulation (simulateTransaction) all flow through gRPC.
+const cetus = CetusClmmSDK.createSDK({ env: NETWORK, full_rpc_url: SUI_GRPC_URL })
+const chain = cetus.FullClient
 
 // -----------------------------------------------------------------------------
 // State (in-memory; per-process)
@@ -333,33 +332,29 @@ interface PoolState {
   tickSpacing: number
   coinTypeA: string
   coinTypeB: string
-  raw: Record<string, unknown>
+  rewarderCoinTypes: string[]
 }
 
 async function getPoolState(): Promise<PoolState> {
-  const pool = await cetus.Pool.getPool(POOL_ID!) as Record<string, unknown>
-  const tickRaw = pool.current_tick_index as { fields?: { bits?: number | string } } | number | string
-  const currentTick = typeof tickRaw === 'object' && tickRaw?.fields?.bits !== undefined
-    ? Number(tickRaw.fields.bits)
-    : Number(tickRaw)
+  const pool = await cetus.Pool.getPool(POOL_ID!)
   return {
-    currentTick,
-    currentSqrtPrice: String(pool.current_sqrt_price ?? '0'),
-    tickSpacing: Number(pool.tickSpacing ?? pool.tick_spacing ?? 60),
-    coinTypeA: String(pool.coinTypeA ?? ''),
-    coinTypeB: String(pool.coinTypeB ?? ''),
-    raw: pool,
+    currentTick: Number(pool.current_tick_index),
+    currentSqrtPrice: String(pool.current_sqrt_price),
+    tickSpacing: Number(pool.tick_spacing),
+    coinTypeA: pool.coin_type_a,
+    coinTypeB: pool.coin_type_b,
+    rewarderCoinTypes: pool.rewarder_infos.map((r) => r.coin_type),
   }
 }
 
 async function getSuiBalance(owner: string): Promise<number> {
-  const r = await sui.getBalance({ owner, coinType: '0x2::sui::SUI' })
-  return Number(r.totalBalance) / 1e9
+  const r = await chain.core.getBalance({ owner, coinType: '0x2::sui::SUI' })
+  return Number(r.balance.balance) / 1e9
 }
 
 async function getUsdcBalance(owner: string): Promise<number> {
-  const r = await sui.getBalance({ owner, coinType: USDC_TYPE })
-  return Number(r.totalBalance) / 1e6
+  const r = await chain.core.getBalance({ owner, coinType: USDC_TYPE })
+  return Number(r.balance.balance) / 1e6
 }
 
 interface Position {
@@ -371,33 +366,19 @@ interface Position {
 }
 
 async function getPositions(owner: string): Promise<Position[]> {
-  const objects = await sui.getOwnedObjects({
-    owner,
-    filter: { StructType: '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb::position::Position' },
-    options: { showContent: true },
-  })
+  // Filter server-side by pool ID — beats scanning every Position NFT owned
+  // by the address, which the old SDK had to do via getOwnedObjects.
+  const list = await cetus.Position.getPositionList(owner, [POOL_ID!])
   const positions: Position[] = []
-  for (const o of objects.data) {
-    const content = o.data?.content
-    if (!content || content.dataType !== 'moveObject') continue
-    const fields = (content as { fields: Record<string, unknown> }).fields
-    const liq = Number(fields.liquidity ?? 0)
-    if (!liq) continue
-    const decode = (raw: unknown): number => {
-      if (typeof raw === 'object' && raw !== null && 'fields' in raw) {
-        const f = (raw as { fields?: { bits?: number | string } }).fields
-        return Number(f?.bits ?? 0)
-      }
-      return Number(raw)
-    }
-    const pos: Position = {
-      posId: o.data!.objectId,
-      liquidity: String(liq),
-      tickLower: decode(fields.tick_lower_index),
-      tickUpper: decode(fields.tick_upper_index),
-      pool: String(fields.pool ?? ''),
-    }
-    if (pos.pool === POOL_ID) positions.push(pos)
+  for (const p of list) {
+    if (p.liquidity === '0' || p.liquidity === '') continue
+    positions.push({
+      posId: p.pos_object_id,
+      liquidity: p.liquidity,
+      tickLower: p.tick_lower_index,
+      tickUpper: p.tick_upper_index,
+      pool: p.pool,
+    })
   }
   return positions
 }
@@ -532,22 +513,30 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     originalPosId: position.posId,
   })
 
-  // Step 1 — remove liquidity + collect fees
+  // Step 1 — remove liquidity + collect fees + collect rewards.
+  // Rewarder coin types must match the pool's actual rewarder set —
+  // mismatched arrays cause the Move call to abort.
   log('info', 'removing_liquidity', { posId: position.posId })
-  const removeTx = await cetus.Position.removeLiquidityTransactionPayload({
+  const removeResult = await cetus.Position.removeLiquidityPayload({
     pool_id: POOL_ID!,
     pos_id: position.posId,
-    coinTypeA: pool.coinTypeA,
-    coinTypeB: pool.coinTypeB,
+    coin_type_a: pool.coinTypeA,
+    coin_type_b: pool.coinTypeB,
     delta_liquidity: position.liquidity,
     min_amount_a: '0',
     min_amount_b: '0',
     collect_fee: true,
-    rewarder_coin_types: [],
+    rewarder_coin_types: pool.rewarderCoinTypes,
   })
+  if (!(removeResult instanceof Transaction)) {
+    // The overloaded return type covers the case where a caller passes an
+    // existing tx (then the SDK returns coin handles). We don't, so this
+    // branch is unreachable in practice.
+    throw new Error('expected Transaction from removeLiquidityPayload')
+  }
+  const removeTx = removeResult
   removeTx.setSender(owner)
-  const removeBytes = Buffer.from(await removeTx.build({ client: sui })).toString('base64')
-  const removeTxHash = await signAndSendTx(removeBytes, 'remove_liquidity')
+  const removeTxHash = await signAndSendTx(removeTx, 'remove_liquidity')
 
   // Wait for remove to reach finality before reading balances or opening a
   // replacement position — otherwise the agent could re-open with stale
@@ -659,8 +648,8 @@ async function openLiquidityFromDecision(
   input: OpenFromDecisionInput,
 ): Promise<string | null> {
   const { owner, pool, decision } = input
-  const usdcRaw = await sui.getBalance({ owner, coinType: USDC_TYPE })
-  const usdcAvailable = Number(usdcRaw.totalBalance)
+  const usdcRaw = await chain.core.getBalance({ owner, coinType: USDC_TYPE })
+  const usdcAvailable = Number(usdcRaw.balance.balance)
   const usdcToUse = Math.floor(usdcAvailable * decision.sizingFraction).toString()
 
   if (Number(usdcToUse) < 10_000) {
@@ -674,34 +663,38 @@ async function openLiquidityFromDecision(
     return null
   }
 
-  const curSqrt = new BN(pool.currentSqrtPrice)
-  const liqInput = ClmmPoolUtil.estLiquidityAndcoinAmountFromOneAmounts(
+  // Pre-compute the amount for the "free" coin from the fixed USDC input
+  // and the strategy's tick range. The SDK's FixToken payload needs both
+  // amounts populated even though only the fixed side is decisive — the
+  // other becomes the max-spend ceiling on coin sourcing.
+  const usdcIsCoinA = pool.coinTypeA === USDC_TYPE
+  const slippage = 0.1
+  const liqInput = ClmmPoolUtil.estLiquidityAndCoinAmountFromOneAmounts(
     decision.tickLower, decision.tickUpper,
     new BN(usdcToUse),
-    true, true, 0.1, curSqrt,
+    usdcIsCoinA, true, slippage,
+    new BN(pool.currentSqrtPrice),
   )
+  const amount_a = usdcIsCoinA ? usdcToUse : liqInput.coin_amount_limit_a
+  const amount_b = usdcIsCoinA ? liqInput.coin_amount_limit_b : usdcToUse
 
-  // SDK 5.4 typed against AddLiquidityParams which doesn't declare `is_open` /
-  // `pos_id`, but the runtime accepts them when opening a new position.
-  // TODO: migrate to openPositionTransactionPayload + addLiquidity once the
-  // recipe is updated.
-  const openPayload = await cetus.Position.createAddLiquidityPayload({
+  const openTx = await cetus.Position.createAddLiquidityFixTokenPayload({
     pool_id: POOL_ID!,
-    coinTypeA: pool.coinTypeA,
-    coinTypeB: pool.coinTypeB,
+    coin_type_a: pool.coinTypeA,
+    coin_type_b: pool.coinTypeB,
     tick_lower: decision.tickLower.toString(),
     tick_upper: decision.tickUpper.toString(),
+    fix_amount_a: usdcIsCoinA,
+    amount_a,
+    amount_b,
+    slippage,
     is_open: true,
     pos_id: '',
-    max_amount_a: liqInput.tokenMaxA.toString(),
-    max_amount_b: liqInput.tokenMaxB.toString(),
-    delta_liquidity: liqInput.liquidityAmount.toString(),
     rewarder_coin_types: [],
     collect_fee: false,
-  } as unknown as Parameters<typeof cetus.Position.createAddLiquidityPayload>[0])
-  openPayload.setSender(owner)
-  const openBytes = Buffer.from(await openPayload.build({ client: sui })).toString('base64')
-  const openTxHash = await signAndSendTx(openBytes, 'open_position')
+  })
+  openTx.setSender(owner)
+  const openTxHash = await signAndSendTx(openTx, 'open_position')
   const openFinality = await waitForFinality(openTxHash, 'open_position')
   if (!openFinality.success) {
     logEvent('open_position_failed', {
@@ -1030,7 +1023,7 @@ async function main(): Promise<void> {
   // Phase 1 (monitor) is read-only — no signup needed. Resolve the WaaP wallet
   // address only when active mode will submit transactions.
   const owner = AGENT_MODE === 'active' ? await whoami() : null
-  if (owner) cetus.senderAddress = owner
+  if (owner) cetus.setSenderAddress(owner)
 
   log('info', 'agent_starting', {
     mode: AGENT_MODE,
