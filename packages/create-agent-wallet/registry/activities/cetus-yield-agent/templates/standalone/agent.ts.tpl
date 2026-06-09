@@ -5,6 +5,13 @@ import { initCetusSDK, ClmmPoolUtil } from '@cetusprotocol/cetus-sui-clmm-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  calculateVolatility,
+  decideRange,
+  type RangeDecision,
+  type RangeStrategyConfig,
+  type TickSample,
+} from './strategy'
 
 // -----------------------------------------------------------------------------
 // Source of truth — this template is the canonical form of the cetus yield
@@ -39,11 +46,26 @@ const VOLATILITY_WINDOW = Number(process.env.VOLATILITY_WINDOW ?? 60)
 const MIN_RANGE_TICKS = Number(process.env.MIN_RANGE_TICKS ?? 100)
 const MAX_RANGE_TICKS = Number(process.env.MAX_RANGE_TICKS ?? 400)
 const VOLATILITY_MULTIPLIER = Number(process.env.VOLATILITY_MULTIPLIER ?? 3.0)
+const MIN_SAMPLES_FOR_ADAPTIVE = Number(process.env.MIN_SAMPLES_FOR_ADAPTIVE ?? 10)
 const STARTUP_COOLDOWN_MS = Number(process.env.STARTUP_COOLDOWN_MS ?? 60_000)
 const YIELD_SCAN_INTERVAL = Number(process.env.YIELD_SCAN_INTERVAL ?? 6) // every Nth cycle
 const USDC_OPEN_FRACTION = Number(process.env.USDC_OPEN_FRACTION ?? 0.40)
 const USDC_REOPEN_FRACTION = Number(process.env.USDC_REOPEN_FRACTION ?? 0.50)
 const ESTIMATED_GAS_SUI = Number(process.env.ESTIMATED_GAS_SUI ?? 0.01)
+
+// Strategy config is assembled once at startup and passed into decideRange()
+// on every open/reopen. Keeping it as a single object means future signals
+// (e.g. fee tier, depth, yield-scan delta) plug into strategy.ts without
+// touching the call sites here.
+const STRATEGY_CONFIG: RangeStrategyConfig = {
+  baseRangeTicks: POSITION_RANGE,
+  minRangeTicks: MIN_RANGE_TICKS,
+  maxRangeTicks: MAX_RANGE_TICKS,
+  volatilityMultiplier: VOLATILITY_MULTIPLIER,
+  minSamplesForAdaptive: MIN_SAMPLES_FOR_ADAPTIVE,
+  openFraction: USDC_OPEN_FRACTION,
+  reopenFraction: USDC_REOPEN_FRACTION,
+}
 
 // Watchdog integration — writes a PID file on startup so external supervisors
 // (systemd Type=simple + a tailer, or a bash watchdog) can detect liveness.
@@ -178,7 +200,6 @@ const cetus = initCetusSDK({ network: NETWORK })
 // State (in-memory; per-process)
 // -----------------------------------------------------------------------------
 
-interface TickSample { ts: number; tick: number }
 const tickHistory: TickSample[] = []
 let totalGasSpent = 0
 let rebalanceCount = 0
@@ -267,33 +288,7 @@ async function getPositions(owner: string): Promise<Position[]> {
 }
 
 // -----------------------------------------------------------------------------
-// Volatility-adaptive range
-// -----------------------------------------------------------------------------
-
-interface VolatilityResult { volatility: number; sampleSize: number; mean: number }
-
-function calculateVolatility(): VolatilityResult {
-  if (tickHistory.length < 2) return { volatility: 0, mean: 0, sampleSize: tickHistory.length }
-  const changes: number[] = []
-  for (let i = 1; i < tickHistory.length; i++) {
-    changes.push(Math.abs(tickHistory[i].tick - tickHistory[i - 1].tick))
-  }
-  const mean = changes.reduce((a, b) => a + b, 0) / changes.length
-  const variance = changes.reduce((a, b) => a + (b - mean) ** 2, 0) / changes.length
-  return { volatility: Math.sqrt(variance), mean, sampleSize: tickHistory.length }
-}
-
-function getAdaptiveRange(tickSpacing: number): number {
-  const { volatility, sampleSize } = calculateVolatility()
-  if (sampleSize < 10) return POSITION_RANGE
-  const adaptive = Math.round(volatility * VOLATILITY_MULTIPLIER * 2)
-  const clamped = Math.max(MIN_RANGE_TICKS, Math.min(MAX_RANGE_TICKS, adaptive))
-  const snapped = Math.ceil(clamped / tickSpacing) * tickSpacing
-  return snapped || POSITION_RANGE
-}
-
-// -----------------------------------------------------------------------------
-// Rebalance logic (active mode)
+// Rebalance logic (active mode) — range/sizing decisions live in strategy.ts
 // -----------------------------------------------------------------------------
 
 function needsRebalance(position: Position, currentTick: number): boolean {
@@ -351,38 +346,94 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     usdcAfter: usdcAfterRemove,
   })
 
-  // Step 2 — open new position with adaptive range
+  // Step 2 — open new position. Range + sizing come from strategy.ts.
   const freshPool = await getPoolState()
-  const range = getAdaptiveRange(freshPool.tickSpacing)
-  const { volatility, sampleSize } = calculateVolatility()
-
-  const tickLower = Math.floor((freshPool.currentTick - range) / freshPool.tickSpacing) * freshPool.tickSpacing
-  const tickUpper = Math.ceil((freshPool.currentTick + range) / freshPool.tickSpacing) * freshPool.tickSpacing
-
-  log('info', 'opening_new_position', {
-    tickLower, tickUpper, currentTick: freshPool.currentTick, range,
-    volatility: volatility.toFixed(2),
+  const balances = { sui: balanceAfterRemove, usdc: usdcAfterRemove }
+  const decision = decideRange({
+    pool: { currentTick: freshPool.currentTick, tickSpacing: freshPool.tickSpacing },
+    tickHistory,
+    balances,
+    trigger: 'reopen',
+    config: STRATEGY_CONFIG,
   })
 
+  log('info', 'opening_new_position', {
+    tickLower: decision.tickLower,
+    tickUpper: decision.tickUpper,
+    currentTick: freshPool.currentTick,
+    halfWidth: decision.halfWidth,
+    reason: decision.reason,
+  })
+
+  const openTxHash = await openLiquidityFromDecision({
+    owner,
+    pool: freshPool,
+    decision,
+    insufficientEvent: 'rebalance_skipped',
+    insufficientLogMessage: 'insufficient_usdc_for_reopen',
+    capExceededLogMessage: 'usdc_exceeds_max_deposit_cap',
+  })
+  if (!openTxHash) return
+
+  rebalanceCount++
+  positionOpenedAt = new Date().toISOString()
+  cyclesInRange = 0
+  cyclesTotal = 0
+
+  logEvent('rebalance_complete', {
+    txHash: openTxHash,
+    newTickLower: decision.tickLower,
+    newTickUpper: decision.tickUpper,
+    rangeUsed: decision.halfWidth,
+    sizingFraction: decision.sizingFraction,
+    decisionReason: decision.reason,
+    volatility: decision.signals.volatility.toFixed(2),
+    volatilitySamples: decision.signals.volatilitySamples,
+    rebalanceNumber: rebalanceCount,
+  })
+  log('info', 'rebalance_complete', {
+    tickLower: decision.tickLower,
+    tickUpper: decision.tickUpper,
+    txHash: openTxHash,
+  })
+}
+
+// Shared open path used by both initial-open and rebalance-reopen. Returns
+// the tx hash on success, or null if the open was skipped (insufficient
+// USDC, max-deposit cap). Side-effects (rebalanceCount, totalGasSpent) are
+// the caller's responsibility — keeps the helper free of mode-specific
+// bookkeeping.
+interface OpenFromDecisionInput {
+  owner: string
+  pool: PoolState
+  decision: RangeDecision
+  insufficientEvent: 'rebalance_skipped' | 'insufficient_funds'
+  insufficientLogMessage: string
+  capExceededLogMessage: string
+}
+
+async function openLiquidityFromDecision(
+  input: OpenFromDecisionInput,
+): Promise<string | null> {
+  const { owner, pool, decision } = input
   const usdcRaw = await sui.getBalance({ owner, coinType: USDC_TYPE })
   const usdcAvailable = Number(usdcRaw.totalBalance)
-  const usdcToUse = Math.floor(usdcAvailable * USDC_REOPEN_FRACTION).toString()
+  const usdcToUse = Math.floor(usdcAvailable * decision.sizingFraction).toString()
 
   if (Number(usdcToUse) < 10_000) {
-    log('warn', 'insufficient_usdc_for_reopen', { usdcAvailable })
-    logEvent('rebalance_skipped', { reason: 'insufficient_usdc', usdcAvailable })
-    return
+    log('warn', input.insufficientLogMessage, { usdcAvailable })
+    logEvent(input.insufficientEvent, { reason: 'insufficient_usdc', usdcAvailable })
+    return null
   }
-
   if (MAX_DEPOSIT_USD !== undefined && Number(usdcToUse) / 1e6 > MAX_DEPOSIT_USD) {
-    log('warn', 'usdc_exceeds_max_deposit_cap', { usdcToUse, maxDepositUsd: MAX_DEPOSIT_USD })
-    logEvent('rebalance_skipped', { reason: 'max_deposit_cap', usdcToUse, cap: MAX_DEPOSIT_USD })
-    return
+    log('warn', input.capExceededLogMessage, { usdcToUse, maxDepositUsd: MAX_DEPOSIT_USD })
+    logEvent(input.insufficientEvent, { reason: 'max_deposit_cap', usdcToUse, cap: MAX_DEPOSIT_USD })
+    return null
   }
 
-  const curSqrt = new BN(freshPool.currentSqrtPrice)
+  const curSqrt = new BN(pool.currentSqrtPrice)
   const liqInput = ClmmPoolUtil.estLiquidityAndcoinAmountFromOneAmounts(
-    tickLower, tickUpper,
+    decision.tickLower, decision.tickUpper,
     new BN(usdcToUse),
     true, true, 0.1, curSqrt,
   )
@@ -393,10 +444,10 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   // recipe is updated.
   const openPayload = await cetus.Position.createAddLiquidityPayload({
     pool_id: POOL_ID!,
-    coinTypeA: freshPool.coinTypeA,
-    coinTypeB: freshPool.coinTypeB,
-    tick_lower: tickLower.toString(),
-    tick_upper: tickUpper.toString(),
+    coinTypeA: pool.coinTypeA,
+    coinTypeB: pool.coinTypeB,
+    tick_lower: decision.tickLower.toString(),
+    tick_upper: decision.tickUpper.toString(),
     is_open: true,
     pos_id: '',
     max_amount_a: liqInput.tokenMaxA.toString(),
@@ -407,75 +458,54 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   } as unknown as Parameters<typeof cetus.Position.createAddLiquidityPayload>[0])
   openPayload.setSender(owner)
   const openBytes = Buffer.from(await openPayload.build({ client: sui })).toString('base64')
-  const openTxHash = await signAndSendTx(openBytes)
-
-  rebalanceCount++
-  positionOpenedAt = new Date().toISOString()
-  cyclesInRange = 0
-  cyclesTotal = 0
-
-  logEvent('rebalance_complete', {
-    txHash: openTxHash,
-    newTickLower: tickLower,
-    newTickUpper: tickUpper,
-    usdcDeposited: usdcToUse,
-    rangeUsed: range,
-    volatility: volatility.toFixed(2),
-    volatilitySamples: sampleSize,
-    rebalanceNumber: rebalanceCount,
-  })
-  log('info', 'rebalance_complete', { tickLower, tickUpper, txHash: openTxHash })
+  return signAndSendTx(openBytes)
 }
 
 async function openInitialPosition(owner: string, pool: PoolState): Promise<void> {
-  const range = getAdaptiveRange(pool.tickSpacing)
-  const { volatility } = calculateVolatility()
-  const tickLower = Math.floor((pool.currentTick - range) / pool.tickSpacing) * pool.tickSpacing
-  const tickUpper = Math.ceil((pool.currentTick + range) / pool.tickSpacing) * pool.tickSpacing
-
-  const usdcRaw = await sui.getBalance({ owner, coinType: USDC_TYPE })
-  const usdcAvailable = Number(usdcRaw.totalBalance)
-  const usdcToUse = Math.floor(usdcAvailable * USDC_OPEN_FRACTION).toString()
-
-  if (Number(usdcToUse) < 10_000) {
-    log('warn', 'insufficient_usdc_to_open', { usdcAvailable })
-    logEvent('insufficient_funds', { usdcAvailable })
-    return
+  const balances = {
+    sui: await getSuiBalance(owner),
+    usdc: await getUsdcBalance(owner),
   }
-  if (MAX_DEPOSIT_USD !== undefined && Number(usdcToUse) / 1e6 > MAX_DEPOSIT_USD) {
-    log('warn', 'usdc_exceeds_max_deposit_cap_initial', { usdcToUse, maxDepositUsd: MAX_DEPOSIT_USD })
-    return
-  }
+  const decision = decideRange({
+    pool: { currentTick: pool.currentTick, tickSpacing: pool.tickSpacing },
+    tickHistory,
+    balances,
+    trigger: 'open',
+    config: STRATEGY_CONFIG,
+  })
 
-  const curSqrt = new BN(pool.currentSqrtPrice)
-  const liqInput = ClmmPoolUtil.estLiquidityAndcoinAmountFromOneAmounts(
-    tickLower, tickUpper,
-    new BN(usdcToUse),
-    true, true, 0.1, curSqrt,
-  )
+  log('info', 'opening_initial_position', {
+    tickLower: decision.tickLower,
+    tickUpper: decision.tickUpper,
+    halfWidth: decision.halfWidth,
+    reason: decision.reason,
+  })
 
-  log('info', 'opening_initial_position', { tickLower, tickUpper, usdc: usdcToUse, range, volatility: volatility.toFixed(2) })
-  const openPayload = await cetus.Position.createAddLiquidityPayload({
-    pool_id: POOL_ID!,
-    coinTypeA: pool.coinTypeA,
-    coinTypeB: pool.coinTypeB,
-    tick_lower: tickLower.toString(),
-    tick_upper: tickUpper.toString(),
-    is_open: true,
-    pos_id: '',
-    max_amount_a: liqInput.tokenMaxA.toString(),
-    max_amount_b: liqInput.tokenMaxB.toString(),
-    delta_liquidity: liqInput.liquidityAmount.toString(),
-    rewarder_coin_types: [],
-    collect_fee: false,
-  } as unknown as Parameters<typeof cetus.Position.createAddLiquidityPayload>[0])
-  openPayload.setSender(owner)
-  const txBytes = Buffer.from(await openPayload.build({ client: sui })).toString('base64')
-  const txHash = await signAndSendTx(txBytes)
+  const txHash = await openLiquidityFromDecision({
+    owner,
+    pool,
+    decision,
+    insufficientEvent: 'insufficient_funds',
+    insufficientLogMessage: 'insufficient_usdc_to_open',
+    capExceededLogMessage: 'usdc_exceeds_max_deposit_cap_initial',
+  })
+  if (!txHash) return
+
   positionOpenedAt = new Date().toISOString()
   totalGasSpent += ESTIMATED_GAS_SUI
-  logEvent('position_opened', { txHash, tickLower, tickUpper, usdc: usdcToUse, range })
-  log('info', 'position_opened', { txHash, tickLower, tickUpper })
+  logEvent('position_opened', {
+    txHash,
+    tickLower: decision.tickLower,
+    tickUpper: decision.tickUpper,
+    rangeUsed: decision.halfWidth,
+    sizingFraction: decision.sizingFraction,
+    decisionReason: decision.reason,
+  })
+  log('info', 'position_opened', {
+    txHash,
+    tickLower: decision.tickLower,
+    tickUpper: decision.tickUpper,
+  })
 }
 
 // -----------------------------------------------------------------------------
@@ -647,7 +677,7 @@ async function runCycle(owner: string | null): Promise<void> {
   // Track tick history for volatility
   tickHistory.push({ ts: Date.now(), tick: pool.currentTick })
   if (tickHistory.length > VOLATILITY_WINDOW) tickHistory.shift()
-  const { volatility, sampleSize } = calculateVolatility()
+  const { volatility, sampleSize } = calculateVolatility(tickHistory)
 
   const balance = owner ? await getSuiBalance(owner) : 0
   const usdcBalance = owner ? await getUsdcBalance(owner) : 0
@@ -687,6 +717,16 @@ async function runCycle(owner: string | null): Promise<void> {
   }
 
   cyclesTotal++
+  // Preview the half-width strategy would pick right now — surfaced to the
+  // dashboard so operators can see what "next rebalance" would look like
+  // without waiting for one to fire.
+  const previewDecision = decideRange({
+    pool: { currentTick: pool.currentTick, tickSpacing: pool.tickSpacing },
+    tickHistory,
+    balances: { sui: balance, usdc: usdcBalance },
+    trigger: 'reopen',
+    config: STRATEGY_CONFIG,
+  })
   for (const pos of positions) {
     const inRange = !needsRebalance(pos, pool.currentTick)
     if (inRange) {
@@ -707,7 +747,7 @@ async function runCycle(owner: string | null): Promise<void> {
         totalGasSpent: totalGasSpent.toFixed(4),
         volatility: volatility.toFixed(2),
         volatilitySamples: sampleSize,
-        adaptiveRange: getAdaptiveRange(pool.tickSpacing),
+        adaptiveRange: previewDecision.halfWidth,
         baseRange: POSITION_RANGE,
       })
     } else {
