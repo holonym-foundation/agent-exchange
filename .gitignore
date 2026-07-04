@@ -1,0 +1,25 @@
+# Secrets & env — NEVER commit (this repo is public). See PUBLIC-REPO-POLICY.md.
+.env
+.env.*
+*.pem
+*.key
+*.keystore
+id_ed25519*
+id_rsa*
+**/secrets/**
+*.secret
+
+# Internal-only content (kept in the private repos)
+deployments/
+agents/
+agent-base/
+*.internal.md
+
+# Node / build
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.log
+.DS_Store

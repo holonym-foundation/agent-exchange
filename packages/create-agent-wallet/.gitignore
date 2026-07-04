@@ -1,0 +1,13 @@
+dist/
+node_modules/
+coverage/
+*.log
+*.tgz
+.env
+.env.local
+
+# The monorepo root .gitignore ignores any `build` directory. Our
+# `registry/build/` contains source (the build-registry.ts script),
+# so negate that match here.
+!registry/build/
+!registry/build/**

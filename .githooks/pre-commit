@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Local mirror of the CI guard — catches leaks BEFORE they land in a public commit.
+# Enable once per clone:  git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/repo-guard.sh"

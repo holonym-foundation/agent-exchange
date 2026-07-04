@@ -1,0 +1,42 @@
+# systemd unit template for the perpetual round-robin pass demo.
+#
+# 1. Install:
+#    sudo cp examples/perpetual-pass.service.template /etc/systemd/system/aex-perpetual-pass.service
+#    (edit User, EnvironmentFile path, EMAIL_BASE)
+# 2. Enable + start:
+#    sudo systemctl daemon-reload && sudo systemctl enable --now aex-perpetual-pass
+# 3. Pause without stopping the unit:
+#    touch /var/lib/aex-fleet/perpetual-pass.paused
+# 4. Resume:
+#    rm /var/lib/aex-fleet/perpetual-pass.paused
+# 5. Tail:
+#    journalctl -u aex-perpetual-pass -f
+# 6. Read demo state:
+#    cat /var/lib/aex-fleet/perpetual-pass.state.json | jq .
+
+[Unit]
+Description=aex-fleet perpetual round-robin Sepolia demo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aex-fleet
+Group=aex-fleet
+Environment=AEX_FLEET_HOME=/var/lib/aex-fleet
+Environment=EMAIL_BASE=demo@holonym.id
+Environment=DELAY=300
+Environment=AMOUNT=0.0001
+EnvironmentFile=-/etc/aex-fleet/perpetual-pass.env
+ExecStart=/usr/local/bin/aex-fleet-perpetual-pass-loop.sh
+Restart=on-failure
+RestartSec=15s
+StandardOutput=journal
+StandardError=journal
+
+# Graceful shutdown — script catches SIGTERM and finishes current hop.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

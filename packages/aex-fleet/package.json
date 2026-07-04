@@ -1,0 +1,58 @@
+{
+  "name": "@human.tech/aex-fleet",
+  "version": "0.0.3",
+  "description": "Multi-agent operator CLI for WaaP wallets",
+  "bin": {
+    "aex-fleet": "./dist/index.js",
+    "axf": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "type": "module",
+  "files": [
+    "dist",
+    "public",
+    "examples",
+    "README.md",
+    "SKILL.md",
+    "templates"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/holonym-foundation/aex.git",
+    "directory": "packages/aex-fleet"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "env-paths": "^3.0.0",
+    "execa": "^9.5.2",
+    "pg": "^8.21.0",
+    "picocolors": "^1.1.1",
+    "proper-lockfile": "^4.1.2",
+    "viem": "^2.21.55",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.20.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.4",
+    "vitest": "^2.0.0"
+  }
+}

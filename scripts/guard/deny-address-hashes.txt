@@ -1,0 +1,13 @@
+# SHA-256 hashes of operational wallet addresses that must never appear in this
+# public repo. The addresses are on-chain-public, but linking them to this codebase
+# is a privacy leak — so we block them by HASH (the addresses themselves are never
+# stored here in cleartext). repo-guard.sh lowercases every 0x… address it finds and
+# fails if the hash matches a line below.
+#
+# To add one: printf '%s' "0x<lowercased-address>" | sha256sum   (or shasum -a 256)
+#
+f1fa675b0f89293acb10ad583726c3584258c0d3074b5a05f5bc7ebbfe3a3355
+a1ae192146dcf058760b19b066fcbc6b0770870ebe0f904c254d1ebf99999965
+58ac9b259a858352556c47246e8719ad74e7355f7034bbc36d1547513c93dfdc
+fab9908eb19f9f94314af6212609b84750d487f5e325a75759a8d7636c511d4b
+877cf7a8f108af93e779f9a973cac3d57b5d1b4c7911f02017e3b7d91784c201

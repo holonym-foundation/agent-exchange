@@ -1,0 +1,28 @@
+services:
+  aex-fleet:
+    build:
+      context: .
+    image: aex-fleet:latest
+    container_name: aex-fleet
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"   # bind only to host loopback; reverse-proxy in front for public
+    volumes:
+      - aex-fleet-data:/var/lib/aex-fleet
+    environment:
+      # Optional — point at your team's read-only Neon DSN for `aex-fleet status` telemetry
+      # AEX_FLEET_NEON_DSN_RO: postgres://…@…/neondb
+      # Optional — override RPC endpoints
+      # AEX_FLEET_RPC_ETHEREUM: https://your-mainnet-rpc
+      # AEX_FLEET_RPC_SEPOLIA:  https://your-sepolia-rpc
+      AEX_FLEET_HOME: /var/lib/aex-fleet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001/api/state > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  aex-fleet-data:
+    name: aex-fleet-data

@@ -1,0 +1,25 @@
+# CODEOWNERS for holonym-foundation/aex
+#
+# Lines later in the file take precedence. The last matching pattern wins.
+# Reviewers on these paths are auto-requested when a PR touches the path.
+
+# Default — repository maintainers
+*                                           @lebraat
+
+# Foundational governance — license, security, contribution policy
+/LICENSE                                    @lebraat
+/SECURITY.md                                @lebraat
+/CONTRIBUTING.md                            @lebraat
+/README.md                                  @lebraat
+/CODEOWNERS                                 @lebraat
+
+# CLI scaffolder source
+/packages/create-agent-wallet/              @lebraat
+
+# Public-repo hygiene — policy, the guard, the hash denylist, CI. Changes here
+# affect what can be published, so they always require maintainer review.
+/PUBLIC-REPO-POLICY.md                      @lebraat
+/scripts/repo-guard.sh                      @lebraat
+/scripts/guard/                             @lebraat
+/.githooks/                                 @lebraat
+/.github/                                   @lebraat

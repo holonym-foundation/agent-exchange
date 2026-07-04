@@ -1,0 +1,35 @@
+name: guard
+
+# Public-repo hygiene gate. Runs on every push + PR. Two layers:
+#   1. gitleaks   — broad, industry secret scanning across the full history.
+#   2. repo-guard — AEX-specific rules (blocked paths, box IPs, internal hostnames,
+#                   managed-DB fingerprints, operational-wallet hash denylist).
+# Make this a REQUIRED status check in branch protection (Settings → Branches).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+      - name: repo-guard (AEX hygiene rules)
+        run: |
+          chmod +x scripts/repo-guard.sh
+          scripts/repo-guard.sh
