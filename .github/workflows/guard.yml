@@ -23,11 +23,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The gitleaks BINARY is free/MIT; only the gitleaks-action wrapper requires a
+      # paid license for organizations. So we run the binary directly — full-history
+      # secret scan, no license, --redact so any hit is never printed in the logs.
       - name: gitleaks (secret scan)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
-          GITLEAKS_ENABLE_SUMMARY: "true"
+        run: |
+          ver=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep -oE '"tag_name": *"v[^"]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${ver}/gitleaks_${ver}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1
 
       - name: repo-guard (AEX hygiene rules)
         run: |
