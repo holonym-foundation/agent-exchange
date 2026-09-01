@@ -4,7 +4,7 @@ A self-contained dashboard that demonstrates managing a fleet of WaaP agent wall
 **Sign in (Human Wallet) → Create agents → Fund → Run → Observe**, with policy controls and a
 wallet-linking preview. This guide gets you from clone to a working demo in ~5 minutes.
 
-> Branch: `shady/aex-fleet-v1` · PR: holonym-foundation/aex#23 · Tracking: internal-docs#1166
+This guide covers collaborative testing of the public AEX Fleet package.
 
 ---
 
@@ -12,9 +12,8 @@ wallet-linking preview. This guide gets you from clone to a working demo in ~5 m
 
 ### Option A — local (fastest, for poking at it)
 ```bash
-git clone git@github.com:holonym-foundation/aex.git
-cd aex && git checkout shady/aex-fleet-v1
-cd packages/aex-fleet
+git clone git@github.com:holonym-foundation/agent-exchange.git
+cd agent-exchange/packages/aex-fleet
 npm install && npm run build
 
 # clean demo slate (does NOT touch any real fleet):
@@ -94,5 +93,5 @@ See `KNOWN_ISSUES.md` for the exact swap points.
 
 ## 5. Give feedback
 
-Drop notes on **holonym-foundation/aex#23** (the PR) or internal-docs#1166. Useful to report:
+Open an issue in **holonym-foundation/agent-exchange**. Useful details to report:
 which step, what you clicked, what the toast/modal said, and a screenshot if the UI looked wrong.

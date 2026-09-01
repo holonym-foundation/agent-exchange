@@ -1,0 +1,31 @@
+name: fleet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "packages/aex-fleet/**"
+      - ".github/workflows/fleet.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/aex-fleet
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/aex-fleet/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high

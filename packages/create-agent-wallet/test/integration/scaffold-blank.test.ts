@@ -17,18 +17,15 @@ beforeAll(async () => {
   // Keep this test honest by re-generating to a temp location.
   const tmpDir = await mkdtemp(resolve(tmpdir(), 'caw-reg-'))
   const regOut = resolve(tmpDir, 'registry.json')
-  // buildRegistry resolves the activities directory by checking multiple
-  // paths. In the monorepo, activities live at repo root agents/ directory.
-  // Pass the repo root so it finds <root>/agents/.
-  const repoRoot = resolve(pkgRoot, '../..')
+  const publicRegistryRoot = resolve(pkgRoot, 'registry')
   await buildRegistry({
-    root: repoRoot,
+    root: publicRegistryRoot,
     out: regOut
   })
   registryUrl = pathToFileURL(regOut).href
 }, 60_000)
 
-describe('scaffold blank-project (non-interactive)', () => {
+describe('scaffold cetus-yield-agent (non-interactive)', () => {
   it('creates a standalone project with expected files', async () => {
     const workDir = await mkdtemp(resolve(tmpdir(), 'caw-int-std-'))
     try {
@@ -37,7 +34,7 @@ describe('scaffold blank-project (non-interactive)', () => {
         [
           binPath,
           '--activity',
-          'blank-project',
+          'cetus-yield-agent',
           '--runtime',
           'standalone',
           '--no-session',
@@ -58,7 +55,7 @@ describe('scaffold blank-project (non-interactive)', () => {
       expect(pkg.name).toBe('my-agent')
 
       const agent = await readFile(resolve(projDir, 'agent.ts'), 'utf8')
-      expect(agent).toContain('[my-agent]')
+      expect(agent).toContain("const AGENT_ID = 'my-agent'")
 
       await stat(resolve(projDir, 'Dockerfile'))
       await stat(resolve(projDir, '.env.example'))
@@ -105,7 +102,7 @@ describe('scaffold blank-project (non-interactive)', () => {
         [
           binPath,
           '--activity',
-          'blank-project',
+          'cetus-yield-agent',
           '--runtime',
           'claude',
           '--no-session',
@@ -125,7 +122,7 @@ describe('scaffold blank-project (non-interactive)', () => {
 
       const claudeMd = await readFile(resolve(projDir, 'CLAUDE.md'), 'utf8')
       expect(claudeMd).toContain('claude-agent')
-      expect(claudeMd).toContain('Blank Project')
+      expect(claudeMd).toContain('Cetus Yield Agent')
 
       await stat(resolve(projDir, 'mcp-config.json'))
       await stat(resolve(projDir, '.env.example'))

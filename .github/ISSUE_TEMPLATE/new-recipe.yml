@@ -1,0 +1,62 @@
+name: Propose a recipe
+description: Propose a reproducible chain or application activity for the AEX registry
+title: "recipe: "
+labels: ["recipe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A recipe must create a specific, observable activity that another developer can safely reproduce without private context.
+  - type: input
+    id: outcome
+    attributes:
+      label: User outcome
+      description: What will the agent do for its operator?
+      placeholder: Monitor and rebalance a SUI/USDC concentrated-liquidity position
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Chain and application
+      placeholder: Sui mainnet / Cetus Protocol
+    validations:
+      required: true
+  - type: textarea
+    id: activity
+    attributes:
+      label: Observable activity
+      description: What on-chain or application result proves that the recipe worked?
+    validations:
+      required: true
+  - type: textarea
+    id: safe_proof
+    attributes:
+      label: Smallest safe proof
+      description: Describe the read-only or simulation mode and its expected output.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Public dependencies
+      description: SDKs, RPCs, APIs, protocol docs, contracts, pools, and runtime requirements.
+    validations:
+      required: true
+  - type: textarea
+    id: live_risk
+    attributes:
+      label: Live-mode risk controls
+      description: If it moves funds, name the hard cap, policies/allowlists, and recovery plan. Otherwise say read-only.
+    validations:
+      required: true
+  - type: dropdown
+    id: provenance
+    attributes:
+      label: Provenance
+      options:
+        - New work
+        - Ported or extracted work with history to preserve
+        - Based on a public upstream project
+    validations:
+      required: true

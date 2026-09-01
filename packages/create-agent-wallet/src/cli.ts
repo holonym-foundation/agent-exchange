@@ -4,7 +4,7 @@ import { CawError, ExitCodes } from './util/errors.js'
 import { log } from './util/logger.js'
 import type { Runtime } from './registry/types.js'
 
-const PKG_VERSION = '0.0.1'
+const PKG_VERSION = '0.1.0'
 
 export function buildProgram(): Command {
   const program = new Command()

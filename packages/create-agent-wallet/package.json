@@ -1,6 +1,6 @@
 {
   "name": "@human.tech/create-agent-wallet",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Scaffold a WaaP agent project in 3 minutes",
   "bin": {
     "create-agent-wallet": "./dist/index.js"
@@ -14,7 +14,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/holonym-foundation/aex.git",
+    "url": "https://github.com/holonym-foundation/agent-exchange.git",
     "directory": "packages/create-agent-wallet"
   },
   "publishConfig": {
@@ -33,7 +33,10 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "validate:activities": "npm run build && node scripts/validate-activities.mjs",
+    "validate:activity": "npm run build && node scripts/validate-activities.mjs",
+    "check": "npm run type-check && npm run build && npm test && node scripts/validate-activities.mjs"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
@@ -45,8 +48,11 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
-    "tsx": "^4.7.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.0.4",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
   }
 }

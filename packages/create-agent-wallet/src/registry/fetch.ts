@@ -34,20 +34,23 @@ export function createFetchRegistry(opts: FetchRegistryOptions): FetchRegistry {
   }
 
   return async function fetchRegistry(): Promise<Registry> {
-    const cached = await cache.read()
-    const age = await cache.ageMs()
+    // A bundled file is versioned with the installed package and is therefore
+    // authoritative. Never let a cache written by an older CLI release mask it.
+    if (opts.url.startsWith('file://')) {
+      return readLocal(opts.url)
+    }
+
+    // ttlMs=0 is a real cache bypass: do not read or fall back to stale data.
+    const cached = opts.ttlMs > 0 ? await cache.read() : null
+    const age = opts.ttlMs > 0 ? await cache.ageMs() : null
     const fresh = age !== null && age < opts.ttlMs
     if (cached && fresh) return cached.payload
 
     try {
       let data: unknown
-      if (opts.url.startsWith('file://')) {
-        data = await readLocal(opts.url)
-      } else {
-        const res = await fetchImpl(opts.url)
-        if (!res.ok) throw new Error(`registry HTTP ${res.status}`)
-        data = await res.json()
-      }
+      const res = await fetchImpl(opts.url)
+      if (!res.ok) throw new Error(`registry HTTP ${res.status}`)
+      data = await res.json()
       const parsed = RegistrySchema.parse(data)
       await cache.write(parsed)
       return parsed

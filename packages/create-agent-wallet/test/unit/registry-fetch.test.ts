@@ -113,6 +113,52 @@ describe('fetchRegistry', () => {
     await rm(localDir, { recursive: true, force: true })
   })
 
+  it('prefers a bundled file over a fresh cache from an older release', async () => {
+    const oldPayload = {
+      ...samplePayload,
+      activities: [{ ...sampleActivity, slug: 'old-activity' }]
+    }
+    const prime = createFetchRegistry({
+      url: 'https://example.com/registry.json',
+      cacheDir,
+      ttlMs: 60_000,
+      fetchImpl: mockFetch(oldPayload)
+    })
+    await prime()
+
+    const localDir = await mkdtemp(resolve(tmpdir(), 'caw-local-'))
+    const regPath = resolve(localDir, 'registry.json')
+    await writeFile(regPath, JSON.stringify(samplePayload))
+    const local = createFetchRegistry({
+      url: pathToFileURL(regPath).href,
+      cacheDir,
+      ttlMs: 60_000,
+      fetchImpl: failingFetch()
+    })
+
+    const result = await local()
+    expect(result.activities[0].slug).toBe('blank-project')
+    await rm(localDir, { recursive: true, force: true })
+  })
+
+  it('does not fall back to stale cache when cache is disabled', async () => {
+    const prime = createFetchRegistry({
+      url: 'https://example.com/registry.json',
+      cacheDir,
+      ttlMs: 60_000,
+      fetchImpl: mockFetch(samplePayload)
+    })
+    await prime()
+
+    const noCache = createFetchRegistry({
+      url: 'https://example.com/registry.json',
+      cacheDir,
+      ttlMs: 0,
+      fetchImpl: failingFetch()
+    })
+    await expect(noCache()).rejects.toThrow(/registry unavailable/i)
+  })
+
   it('rejects malformed registry payload', async () => {
     const fetchRegistry = createFetchRegistry({
       url: 'https://example.com/registry.json',
