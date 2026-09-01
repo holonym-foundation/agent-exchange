@@ -36,7 +36,7 @@
     "type-check": "tsc --noEmit",
     "validate:activities": "npm run build && node scripts/validate-activities.mjs",
     "validate:activity": "npm run build && node scripts/validate-activities.mjs",
-    "check": "npm run type-check && npm test && npm run validate:activities"
+    "check": "npm run type-check && npm run build && npm test && node scripts/validate-activities.mjs"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
