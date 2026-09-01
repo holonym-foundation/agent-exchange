@@ -75,10 +75,10 @@ describe('ActivitySchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('validates the shipped Blank Project activity.json', async () => {
+  it('validates the shipped Cetus Yield Agent activity.json', async () => {
     const path = resolve(
       __dirname,
-      '../../../../agents/blank-project/activity.json'
+      '../../registry/activities/cetus-yield-agent/activity.json'
     )
     const raw = JSON.parse(await readFile(path, 'utf8'))
     const result = ActivitySchema.safeParse(raw)

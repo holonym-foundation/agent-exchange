@@ -8,7 +8,7 @@ npx @human.tech/create-agent-wallet
 
 Interactive prompts pick an **Activity** (what the agent does), a **runtime** (Claude, Standalone, OpenClaw, or Nous/Hermes Agent), and a **project name**. The generator stamps out a working project — you `cd` in, copy `.env.example`, and run.
 
-Part of the [Agent Exchange (AEX)](https://github.com/holonym-foundation/aex).
+Part of the [Agent Exchange (AEX)](https://github.com/holonym-foundation/agent-exchange).
 
 ## Features
 
@@ -143,7 +143,7 @@ Activities live in [`registry/activities/`](./registry/activities). Each directo
 - `README.md` — human description (rendered into docs site)
 - `templates/<runtime>/` — files copied on scaffold
 
-A build step aggregates per-activity `activity.json` files into a single `registry.json` published at `docs.waap.xyz/registry.json`. The CLI fetches this once per 24h and caches locally at `~/.create-agent-wallet/registry.json`.
+A build step aggregates per-activity `activity.json` files into `dist/registry.json` and bundles it with the published package. The CLI uses that bundled registry by default, so scaffolding does not depend on a separately hosted registry endpoint. An explicit `--registry` URL can still override it.
 
 ## Contributing an Activity
 

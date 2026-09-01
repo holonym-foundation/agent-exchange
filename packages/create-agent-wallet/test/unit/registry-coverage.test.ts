@@ -62,33 +62,12 @@ describe('registry coverage', () => {
 
   it('ships the expected template-class activities', async () => {
     const { template } = await classify()
-    expect(template).toEqual([
-      'blank-project',
-      'cetus-yield-agent',
-      'cicd-agent',
-      'evm-portfolio-rebalancer',
-      'evm-trading-smart-money-rotator',
-      'evm-uniswap-rebalancer',
-      'morpho-yield-agent',
-      'polymarket-agent',
-      'polymarket-arbitrage',
-      'polymarket-llm-analyst',
-      'recurring-payments',
-      'snapshot-agent',
-      'sui-portfolio-rebalancer'
-    ])
+    expect(template).toEqual(['cetus-yield-agent'])
   })
 
   it('ships the expected profile-class activities', async () => {
     const { profile } = await classify()
-    expect(profile).toEqual([
-      'autoresearch',
-      'dca-accumulator',
-      'gas-claims-reminder',
-      'gem-hunter',
-      'privacy-guard',
-      'security-guard'
-    ])
+    expect(profile).toEqual([])
   })
 
   it('every activity.json validates against the schema', async () => {

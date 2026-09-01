@@ -26,8 +26,8 @@ waap-cli --version
 Or, if you're working from the monorepo:
 
 ```bash
-git clone git@github.com:holonym-foundation/aex.git
-cd aex/packages/aex-fleet
+git clone git@github.com:holonym-foundation/agent-exchange.git
+cd agent-exchange/packages/aex-fleet
 npm install && npm run build && npm link
 ```
 

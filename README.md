@@ -2,8 +2,8 @@
 
 > Discover, deploy, and operate AI agents that move money on-chain.
 
-**Agent Exchange** is human.tech's open catalog of AI agents. Every agent here is a
-complete, working program — fork it, or scaffold a new one in 60 seconds with
+**Agent Exchange** is human.tech's open catalog of AI agents. Every published activity
+includes a complete, reviewable starter — fork it, or scaffold one in 60 seconds with
 `npx @human.tech/create-agent-wallet`.
 
 This repository is the **public, open-source home for what builders touch**: the CLI
@@ -25,13 +25,21 @@ funds. See [`PUBLIC-REPO-POLICY.md`](./PUBLIC-REPO-POLICY.md).
 
 ```bash
 npx @human.tech/create-agent-wallet
-# pick an activity (Cetus yield, Morpho yield, Polymarket, Snapshot governance, …)
+# pick Cetus Yield Agent
 # pick a runtime (Claude, Standalone, OpenClaw, Nous)
 # pick a chain
 # done — your project runs
 ```
 
 See [`packages/create-agent-wallet/registry/activities/`](packages/create-agent-wallet/registry/activities/) for the live list of activities.
+
+## Featured recipe: Cetus Yield Agent
+
+The first public activity is the [Cetus Yield Agent](packages/create-agent-wallet/registry/activities/cetus-yield-agent/README.md),
+an autonomous concentrated-liquidity agent for Cetus Protocol on Sui. It ships in safe
+monitor mode, includes a transaction-simulation path, and requires an explicit USD cap
+before active mode can move funds. Its extracted contribution history is retained in Git
+and summarized in the activity's [`HISTORY.md`](packages/create-agent-wallet/registry/activities/cetus-yield-agent/HISTORY.md).
 
 ## Built on WaaP
 

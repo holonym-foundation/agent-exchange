@@ -19,7 +19,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/holonym-foundation/aex.git",
+    "url": "https://github.com/holonym-foundation/agent-exchange.git",
     "directory": "packages/aex-fleet"
   },
   "publishConfig": {
