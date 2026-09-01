@@ -17,19 +17,24 @@ funds. See [`PUBLIC-REPO-POLICY.md`](./PUBLIC-REPO-POLICY.md).
 | Path | Purpose |
 |------|---------|
 | [`packages/create-agent-wallet/`](packages/create-agent-wallet/) | The `npx @human.tech/create-agent-wallet` CLI scaffolder + the **activity registry** it scaffolds from |
-| `packages/create-agent-wallet/registry/activities/<slug>/` | One folder per starter agent: manifest, recipe, per-runtime templates, audits |
+| `packages/create-agent-wallet/registry/activities/<slug>/` | One folder per starter agent: manifest, guide, history, and per-runtime templates |
+| [`packages/aex-fleet/`](packages/aex-fleet/) | Experimental fleet-operations CLI; not required to create or run a recipe |
 | [`skills/`](skills/) | Reusable, generic agent skills |
 | [`PUBLIC-REPO-POLICY.md`](./PUBLIC-REPO-POLICY.md) | What belongs here, what never does, and how it's enforced |
 
 ## Quick start
 
 ```bash
-npx @human.tech/create-agent-wallet
+npx @human.tech/create-agent-wallet@latest
 # pick Cetus Yield Agent
 # pick a runtime (Claude, Standalone, OpenClaw, Nous)
-# pick a chain
 # done — your project runs
 ```
+
+The public Cetus release requires CLI `0.1.0` or newer. Until that version is
+published to npm, build and run the CLI from this repository; the older npm `0.0.1`
+package comes from the archived repository and does not contain the safety updates in
+this tree.
 
 See [`packages/create-agent-wallet/registry/activities/`](packages/create-agent-wallet/registry/activities/) for the live list of activities.
 
@@ -40,6 +45,8 @@ an autonomous concentrated-liquidity agent for Cetus Protocol on Sui. It ships i
 monitor mode, includes a transaction-simulation path, and requires an explicit USD cap
 before active mode can move funds. Its extracted contribution history is retained in Git
 and summarized in the activity's [`HISTORY.md`](packages/create-agent-wallet/registry/activities/cetus-yield-agent/HISTORY.md).
+The exact public verification scope and commands are recorded in
+[`VERIFICATION.md`](packages/create-agent-wallet/registry/activities/cetus-yield-agent/VERIFICATION.md).
 
 ## Built on WaaP
 
@@ -51,7 +58,10 @@ Every agent uses [WaaP (Wallet-as-a-Protocol)](https://waap.xyz) for signing:
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`PUBLIC-REPO-POLICY.md`](./PUBLIC-REPO-POLICY.md).
+To add another recipe, start with the public
+[`activity contribution guide`](packages/create-agent-wallet/CONTRIBUTING-ACTIVITY.md),
+then read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and
+[`PUBLIC-REPO-POLICY.md`](./PUBLIC-REPO-POLICY.md).
 Enable the local hygiene hook once per clone:
 
 ```bash

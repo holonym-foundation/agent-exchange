@@ -57,3 +57,10 @@ enabled, inspect the simulated effects, and only then set `DRY_RUN=false`.
 ## Full recipe
 
 [docs.wallet.human.tech/recipes/cetus-yield-agent](https://docs.wallet.human.tech/recipes/cetus-yield-agent) — 5 phases from monitor → active → adaptive ranges → cross-pool / cross-protocol comparisons.
+
+## Verification status
+
+See [`VERIFICATION.md`](./VERIFICATION.md) for the reproducible scaffold, build,
+read-only mainnet smoke test, and the explicit boundary of what has not yet been tested
+with funds. `verified: true` means maintainers reproduced the safe public path; it is
+not a profitability claim or an audit of Cetus Protocol.

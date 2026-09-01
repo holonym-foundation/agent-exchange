@@ -133,4 +133,22 @@ describe('registry coverage', () => {
       }
     }
   })
+
+  it('documents every standalone env key in activity.json', async () => {
+    const { template } = await classify()
+    for (const slug of template) {
+      const raw = JSON.parse(
+        await readFile(resolve(REGISTRY, slug, 'activity.json'), 'utf8')
+      )
+      const documented = new Set(raw.envVars.map((entry: { key: string }) => entry.key))
+      const envTemplate = await readFile(
+        resolve(REGISTRY, slug, 'templates/standalone/dot-env.example'),
+        'utf8'
+      )
+      const configured = [...envTemplate.matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=/gm)]
+        .map((match) => match[1])
+      const missing = configured.filter((key) => !documented.has(key))
+      expect(missing, `${slug} has undocumented standalone env keys`).toEqual([])
+    }
+  })
 })

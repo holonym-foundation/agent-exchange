@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx agent.ts",
     "start": "tsx agent.ts",
+    "type-check": "tsc --noEmit",
     "compose:up": "docker compose up -d",
     "compose:logs": "docker compose logs -f agent",
     "compose:down": "docker compose down"

@@ -1,0 +1,28 @@
+name: recipes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "packages/create-agent-wallet/**"
+      - ".github/workflows/recipes.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/create-agent-wallet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/create-agent-wallet/package-lock.json
+      - run: npm ci
+      - run: npm run check

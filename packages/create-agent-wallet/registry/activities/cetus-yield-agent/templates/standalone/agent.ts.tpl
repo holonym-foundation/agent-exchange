@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { execa } from 'execa'
 import { Transaction } from '@mysten/sui/transactions'
 import { CetusClmmSDK } from '@cetusprotocol/sui-clmm-sdk'
-import { ClmmPoolUtil } from '@cetusprotocol/common-sdk'
+import { ClmmPoolUtil, TickMath } from '@cetusprotocol/common-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -44,6 +44,7 @@ const MAX_DEPOSIT_USD = process.env.AGENT_MAX_DEPOSIT_USD
   : undefined
 const USDC_TYPE = process.env.USDC_TYPE
   ?? '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC'
+const SUI_TYPE = '0x2::sui::SUI'
 
 // Volatility-adaptive range parameters
 const VOLATILITY_WINDOW = Number(process.env.VOLATILITY_WINDOW ?? 60)
@@ -339,6 +340,14 @@ interface PoolState {
 
 async function getPoolState(): Promise<PoolState> {
   const pool = await cetus.Pool.getPool(POOL_ID!)
+  const isSuiUsdc =
+    (pool.coin_type_a === SUI_TYPE && pool.coin_type_b === USDC_TYPE)
+    || (pool.coin_type_a === USDC_TYPE && pool.coin_type_b === SUI_TYPE)
+  if (!isSuiUsdc) {
+    throw new Error(
+      `CETUS_POOL_ID must identify a SUI/USDC pool; received ${pool.coin_type_a} / ${pool.coin_type_b}`,
+    )
+  }
   return {
     currentTick: Number(pool.current_tick_index),
     currentSqrtPrice: String(pool.current_sqrt_price),
@@ -350,7 +359,7 @@ async function getPoolState(): Promise<PoolState> {
 }
 
 async function getSuiBalance(owner: string): Promise<number> {
-  const r = await chain.core.getBalance({ owner, coinType: '0x2::sui::SUI' })
+  const r = await chain.core.getBalance({ owner, coinType: SUI_TYPE })
   return Number(r.balance.balance) / 1e9
 }
 
@@ -604,7 +613,7 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     decision,
     insufficientEvent: 'rebalance_skipped',
     insufficientLogMessage: 'insufficient_usdc_for_reopen',
-    capExceededLogMessage: 'usdc_exceeds_max_deposit_cap',
+    capExceededLogMessage: 'deposit_exceeds_max_usd_cap',
   })
   if (!openTxHash) return
   clearIntent()
@@ -634,7 +643,8 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
 
 // Shared open path used by both initial-open and rebalance-reopen. Returns
 // the tx hash on success, or null if the open was skipped (insufficient
-// USDC, max-deposit cap). Side-effects (rebalanceCount, totalGasSpent) are
+// SUI/USDC balances and the total-USD deposit cap). Side-effects
+// (rebalanceCount, totalGasSpent) are
 // the caller's responsibility — keeps the helper free of mode-specific
 // bookkeeping.
 interface OpenFromDecisionInput {
@@ -659,12 +669,6 @@ async function openLiquidityFromDecision(
     logEvent(input.insufficientEvent, { reason: 'insufficient_usdc', usdcAvailable })
     return null
   }
-  if (MAX_DEPOSIT_USD !== undefined && Number(usdcToUse) / 1e6 > MAX_DEPOSIT_USD) {
-    log('warn', input.capExceededLogMessage, { usdcToUse, maxDepositUsd: MAX_DEPOSIT_USD })
-    logEvent(input.insufficientEvent, { reason: 'max_deposit_cap', usdcToUse, cap: MAX_DEPOSIT_USD })
-    return null
-  }
-
   // Pre-compute the amount for the "free" coin from the fixed USDC input
   // and the strategy's tick range. The SDK's FixToken payload needs both
   // amounts populated even though only the fixed side is decisive — the
@@ -679,6 +683,41 @@ async function openLiquidityFromDecision(
   )
   const amount_a = usdcIsCoinA ? usdcToUse : liqInput.coin_amount_limit_a
   const amount_b = usdcIsCoinA ? liqInput.coin_amount_limit_b : usdcToUse
+
+  // Enforce the cap against BOTH legs of the planned CLMM deposit. Cetus's
+  // pool price is coin B per coin A after decimal adjustment. For a USDC/SUI
+  // pool that means SUI-per-USDC, so the SUI leg's USD value is SUI / price;
+  // for SUI/USDC it is SUI * price. The earlier implementation checked only
+  // the fixed USDC leg and could therefore understate total deployed value.
+  const priceBPerA = TickMath.sqrtPriceX64ToPrice(
+    new BN(pool.currentSqrtPrice),
+    usdcIsCoinA ? 6 : 9,
+    usdcIsCoinA ? 9 : 6,
+  ).toNumber()
+  if (!Number.isFinite(priceBPerA) || priceBPerA <= 0) {
+    throw new Error(`invalid SUI/USDC pool price: ${priceBPerA}`)
+  }
+  const amountA = Number(amount_a) / (usdcIsCoinA ? 1e6 : 1e9)
+  const amountB = Number(amount_b) / (usdcIsCoinA ? 1e9 : 1e6)
+  const estimatedDepositUsd = usdcIsCoinA
+    ? amountA + amountB / priceBPerA
+    : amountA * priceBPerA + amountB
+  if (!Number.isFinite(estimatedDepositUsd)) {
+    throw new Error('could not value the planned SUI/USDC deposit')
+  }
+  if (MAX_DEPOSIT_USD !== undefined && estimatedDepositUsd > MAX_DEPOSIT_USD) {
+    log('warn', input.capExceededLogMessage, {
+      estimatedDepositUsd,
+      maxDepositUsd: MAX_DEPOSIT_USD,
+      usdcToUse,
+    })
+    logEvent(input.insufficientEvent, {
+      reason: 'max_deposit_cap',
+      estimatedDepositUsd,
+      cap: MAX_DEPOSIT_USD,
+    })
+    return null
+  }
 
   const openTx = await cetus.Position.createAddLiquidityFixTokenPayload({
     pool_id: POOL_ID!,
@@ -747,7 +786,7 @@ async function openInitialPosition(owner: string, pool: PoolState): Promise<void
     decision,
     insufficientEvent: 'insufficient_funds',
     insufficientLogMessage: 'insufficient_usdc_to_open',
-    capExceededLogMessage: 'usdc_exceeds_max_deposit_cap_initial',
+    capExceededLogMessage: 'deposit_exceeds_max_usd_cap_initial',
   })
   if (!txHash) {
     clearIntent()

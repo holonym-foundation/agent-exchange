@@ -54,7 +54,7 @@
     {
       "key": "AGENT_MAX_DEPOSIT_USD",
       "required": true,
-      "description": "Hard cap on USD deployed when opening or reopening a position. Active mode refuses to start without a positive value."
+      "description": "Hard cap on the estimated total USD value of both SUI and USDC deposited when opening or reopening. Active mode refuses to start without a positive value."
     },
     {
       "key": "DRY_RUN",
@@ -71,11 +71,112 @@
       "key": "LOG_FILE",
       "required": false,
       "description": "Optional path for a JSON-line log file (default: `<projectName>.log` in cwd)"
+    },
+    {
+      "key": "VOLATILITY_WINDOW",
+      "required": false,
+      "default": "60",
+      "description": "Number of recent cycles used to estimate tick volatility"
+    },
+    {
+      "key": "MIN_RANGE_TICKS",
+      "required": false,
+      "default": "100",
+      "description": "Minimum adaptive position half-width in ticks"
+    },
+    {
+      "key": "MAX_RANGE_TICKS",
+      "required": false,
+      "default": "400",
+      "description": "Maximum adaptive position half-width in ticks"
+    },
+    {
+      "key": "VOLATILITY_MULTIPLIER",
+      "required": false,
+      "default": "3.0",
+      "description": "Multiplier applied to observed tick volatility when selecting the range"
+    },
+    {
+      "key": "MIN_SAMPLES_FOR_ADAPTIVE",
+      "required": false,
+      "default": "10",
+      "description": "Minimum tick samples required before adaptive ranges activate"
+    },
+    {
+      "key": "USDC_OPEN_FRACTION",
+      "required": false,
+      "default": "0.40",
+      "description": "Fraction of available USDC considered for an initial position, still bounded by the USD cap"
+    },
+    {
+      "key": "USDC_REOPEN_FRACTION",
+      "required": false,
+      "default": "0.50",
+      "description": "Fraction of available USDC considered when reopening, still bounded by the USD cap"
+    },
+    {
+      "key": "SUI_GRPC_URL",
+      "required": false,
+      "description": "Alias for the Sui gRPC endpoint; SUI_RPC takes precedence"
+    },
+    {
+      "key": "USDC_TYPE",
+      "required": false,
+      "description": "Override the default Sui USDC coin type"
+    },
+    {
+      "key": "ESTIMATED_GAS_SUI",
+      "required": false,
+      "default": "0.01",
+      "description": "Estimated SUI gas per transaction used for local cumulative telemetry"
+    },
+    {
+      "key": "WAAP_AGENT_ADDRESS",
+      "required": false,
+      "description": "Optional Sui wallet address override for non-interactive WaaP hosts"
+    },
+    {
+      "key": "YIELD_SCAN_INTERVAL",
+      "required": false,
+      "default": "6",
+      "description": "Run the cross-protocol yield scan every N agent cycles"
+    },
+    {
+      "key": "STARTUP_COOLDOWN_MS",
+      "required": false,
+      "default": "60000",
+      "description": "Delay before active mode may open a position after startup"
+    },
+    {
+      "key": "WRITE_PID_FILE",
+      "required": false,
+      "default": "true",
+      "description": "Write a PID file for external supervisor liveness checks"
+    },
+    {
+      "key": "PID_FILE",
+      "required": false,
+      "description": "Override the supervisor PID-file path"
+    },
+    {
+      "key": "MATRIX_HOMESERVER",
+      "required": false,
+      "description": "Optional Matrix homeserver for operational alerts"
+    },
+    {
+      "key": "MATRIX_ACCESS_TOKEN",
+      "required": false,
+      "description": "Optional Matrix access token; keep it only in the local .env or a secret manager"
+    },
+    {
+      "key": "MATRIX_ALERT_ROOM",
+      "required": false,
+      "description": "Optional Matrix room ID for error and rebalance alerts"
     }
   ],
   "waapFeatures": ["send-tx", "policy"],
   "recipeUrl": "https://docs.wallet.human.tech/recipes/cetus-yield-agent",
-  "minCliVersion": "0.0.1",
+  "minCliVersion": "0.1.0",
   "eip8004": {
     "supportedTrust": ["tee-attestation", "reputation"],
     "x402Support": false,

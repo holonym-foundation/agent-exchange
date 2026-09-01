@@ -1,6 +1,6 @@
 {
   "name": "@human.tech/create-agent-wallet",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Scaffold a WaaP agent project in 3 minutes",
   "bin": {
     "create-agent-wallet": "./dist/index.js"
@@ -33,7 +33,10 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "validate:activities": "npm run build && node scripts/validate-activities.mjs",
+    "validate:activity": "npm run build && node scripts/validate-activities.mjs",
+    "check": "npm run type-check && npm test && npm run validate:activities"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",

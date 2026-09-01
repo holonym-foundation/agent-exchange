@@ -13,10 +13,12 @@ Part of the [Agent Exchange (AEX)](https://github.com/holonym-foundation/agent-e
 ## Features
 
 - **4 runtimes:** Claude (SKILL.md + CLAUDE.md + MCP config), Standalone (Node.js + Dockerfile), OpenClaw (AgentSkills SKILL.md), and Nous / Hermes Agent (AgentSkills SKILL.md). OpenClaw + Nous share the [AgentSkills open standard](https://agentskills.io/) so the same SKILL.md works across both (and any other AgentSkills-compatible runtime).
-- **Curated Activity registry:** 11 launch templates plus a Blank Project scaffold — Polymarket Signal Trader, Polymarket Arbitrage, Polymarket LLM Analyst, Snapshot Governance, Cetus Yield, Morpho Yield, EVM Uniswap Rebalancer, EVM Portfolio Rebalancer, Sui Portfolio Rebalancer, Recurring Payments, CI/CD Agent.
+- **Public Activity registry:** currently ships the Cetus Yield Agent as the first
+  reference recipe. New recipes are added through the public contribution contract.
 - **Session bootstrapping:** detects `~/.waap-cli/session.json`; prompts inline if absent.
 - **Non-interactive mode:** full flag-based usage for CI / agent orchestration.
-- **Offline-capable:** bundled registry fallback if `docs.waap.xyz` is unreachable.
+- **Offline-capable:** the release contains its registry and templates; an explicit
+  remote registry remains available for development and testing.
 - **[EIP-8004](https://eips.ethereum.org/EIPS/eip-8004) ready:** every scaffolded project ships a valid `agent-registration.json` (plus `.well-known/agent-registration.json` for standalone) so the agent is discoverable the moment an Identity Registry contract is deployed.
 
 ## Usage
@@ -31,7 +33,7 @@ npx @human.tech/create-agent-wallet
 
 ```bash
 npx @human.tech/create-agent-wallet \
-  --activity polymarket-agent \
+  --activity cetus-yield-agent \
   --runtime standalone \
   --no-session \
   --yes \
@@ -70,7 +72,7 @@ npx @human.tech/create-agent-wallet \
 
 ```
 my-agent/
-├── package.json              pnpm/npm ready, tsx + execa
+├── package.json              npm ready, tsx + execa
 ├── agent.ts                  your loop — shells out to waap-cli
 ├── Dockerfile                production container
 ├── tsconfig.json
@@ -147,11 +149,12 @@ A build step aggregates per-activity `activity.json` files into `dist/registry.j
 
 ## Contributing an Activity
 
-See [CONTRIBUTING-ACTIVITY.md](./CONTRIBUTING-ACTIVITY.md).
+See [CONTRIBUTING-ACTIVITY.md](./CONTRIBUTING-ACTIVITY.md). The one-command local gate is:
 
-## Design doc
-
-See [docs/plans/002-create-agent-wallet-cli-design-plan-2026-04-20.md](../../docs/plans/002-create-agent-wallet-cli-design-plan-2026-04-20.md).
+```bash
+npm ci
+npm run check
+```
 
 ## License
 

@@ -52,7 +52,7 @@ DRY_RUN=true
 # INTENT_FILE=./agent.intent.json
 
 # Required before active mode will start. Choose a conservative value.
-AGENT_MAX_DEPOSIT_USD=100           # hard cap on deployed USD (skips rebalances/opens that exceed)
+AGENT_MAX_DEPOSIT_USD=100           # hard cap on total SUI + USDC deposit value
 ESTIMATED_GAS_SUI=0.01              # rough per-tx gas estimate for accumulating totalGasSpent
 
 # Optional — bypass `waap-cli whoami` on startup. Set to the agent's Sui wallet
