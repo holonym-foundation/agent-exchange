@@ -6,6 +6,7 @@ FROM node:24-slim
 WORKDIR /app
 RUN chown -R node:node /app
 USER node
+RUN mkdir -m 700 /app/state
 
 COPY --chown=node:node package*.json ./
 RUN npm install --omit=dev

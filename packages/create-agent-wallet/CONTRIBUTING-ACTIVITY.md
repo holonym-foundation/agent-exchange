@@ -145,3 +145,7 @@ The optional `eip8004` block describes supported trust models and public service
 Service endpoints may contain `{{host}}` and `{{walletAddress}}`; generated files leave
 deployment-dependent values as explicit `__TODO_*__` placeholders. A recipe does not
 claim on-chain registration merely because it emits the registration document.
+
+## Packed standalone acceptance
+
+Run `npm run check:consumers` before publishing a standalone recipe. It verifies the actual npm artifact in a temporary consumer, generates each standalone project without a wallet session or registry cache, installs declared dependencies without lifecycle scripts, and runs the project's `type-check` script. CI runs the same check. Keep live RPC/model evaluation and funded-action acceptance explicit and separate; compiling a generated project does not prove its usefulness or authorization boundary.

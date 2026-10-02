@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+*.log
+logs
+state
+*.intent.json*
+*.pid
+.waap-cli
+.waap-agent

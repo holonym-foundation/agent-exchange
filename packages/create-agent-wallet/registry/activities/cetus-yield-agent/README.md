@@ -11,7 +11,7 @@ Runs on **Sui mainnet** (or testnet via `NETWORK=testnet`).
 | `monitor`    | Reads pool state, simulates a position, logs drift events | None (read-only)   |
 | `active`     | Opens + rebalances real positions via `waap-cli send-tx`  | Real funds at risk |
 
-The default is `monitor`. Switch to `active` only after a few cycles of confidence in the monitor logs.
+The default is `monitor`. Before active submission, validate simulation results and configure WaaP permissions for the intended chain, functions and amounts. Monitoring alone does not prove spending readiness.
 
 ## Supported runtimes
 
@@ -43,11 +43,11 @@ cd cetus-agent
 cp .env.example .env
 # edit .env, set CETUS_POOL_ID
 npm install
-waap-cli signup --email you+cetus@example.com --password '...'
-waap-cli chain set sui:mainnet
+npx waap-cli signup --email you+cetus@example.com --password-stdin
+# Monitor mode needs no wallet signup; transaction commands select the chain explicitly.
 npm run dev      # local
 # or
-docker compose up -d   # 24/7 with restart:unless-stopped
+docker compose up -d   # inspect failures; no automatic restart after uncertainty
 ```
 
 The generated project starts in `AGENT_MODE=monitor` and `DRY_RUN=true`. Before live
@@ -64,3 +64,20 @@ See [`VERIFICATION.md`](./VERIFICATION.md) for the reproducible scaffold, build,
 read-only mainnet smoke test, and the explicit boundary of what has not yet been tested
 with funds. `verified: true` means maintainers reproduced the safe public path; it is
 not a profitability claim or an audit of Cetus Protocol.
+
+## Execution and recovery
+
+The standalone template pins WaaP CLI **2.2.1** and sends Sui **TransactionKind** bytes on stdin. WaaP prepares the full transaction and enforces its signing policy. `AGENT_MAX_DEPOSIT_USD` is a local strategy limit, not a substitute for the wallet's externally enforced permissions.
+
+Before submission, the agent synchronously persists an intent containing the owner, pool, network, operation and transaction-kind hash. It records a returned transaction digest before waiting for finality. Disk failures, malformed/missing receipts and unknown finality stop execution. A pending intent blocks startup and subsequent actions; an existing position is not proof that this particular submission succeeded. Simulation failures fail the cycle, and dry runs never clear or overwrite a live intent.
+
+Use persistent local storage for `INTENT_FILE`. Docker Compose mounts `execution-state` at `/app/state` and disables automatic restart. Keep that volume when rebuilding; `docker compose down -v` deletes recovery evidence and must not be used while a submission is unresolved. An exclusive adjacent `.lock` directory prevents another active process using the same journal. A crash may leave that lock; it is never stolen by a timeout.
+
+When recovery is required:
+
+1. Stop every process using this wallet/journal and preserve the intent, lock metadata and logs.
+2. Reconcile the recorded digest and exact owner/pool/network with independent chain receipts and WaaP operation records. If the digest was lost, obtain the corresponding operation outcome from WaaP; a balance or position snapshot alone is insufficient.
+3. Keep the agent stopped while an operation might still submit or its outcome remains unknown. Do not retry the transaction or merely delete the journal.
+4. After establishing the final outcome and reviewing the next intended action, archive the evidence and remove the resolved intent and stale lock. Recheck balances, positions and wallet permissions before restarting.
+
+The shipped regression tests cover encoding and injected failures without funds. They do not establish live policy enforcement, provider availability, profitability or funded transaction acceptance. Default polling remains five minutes (`CHECK_INTERVAL_MS=300000`); use faster checks only for a bounded rehearsal, then select a schedule appropriate to the strategy and cost.

@@ -18,7 +18,7 @@
   "dependencies": {
     "@cetusprotocol/common-sdk": "^1.3.7",
     "@cetusprotocol/sui-clmm-sdk": "^1.4.5",
-    "@human.tech/waap-cli": "^2.2.0",
+    "@human.tech/waap-cli": "2.2.1",
     "@mysten/sui": "^2.17.0",
     "bn.js": "^5.2.1",
     "dotenv": "^16.4.5",

@@ -6,6 +6,8 @@ import { ClmmPoolUtil, TickMath } from '@cetusprotocol/common-sdk'
 import BN from 'bn.js'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
+import { IntentJournal, RecoveryRequiredError, encodeTransactionKind, parseSubmissionReceipt, type ExecutionIntent } from './execution'
 import {
   calculateVolatility,
   decideRange,
@@ -37,7 +39,8 @@ const NETWORK = (process.env.NETWORK ?? 'mainnet') as 'mainnet' | 'testnet'
 // Both legacy SUI_RPC and SUI_GRPC_URL are honored; SUI_RPC takes precedence.
 const DEFAULT_SUI_GRPC_URL = `https://fullnode.${NETWORK}.sui.io:443`
 const SUI_GRPC_URL = process.env.SUI_RPC ?? process.env.SUI_GRPC_URL ?? DEFAULT_SUI_GRPC_URL
-const DRY_RUN = (process.env.DRY_RUN ?? 'true').toLowerCase() === 'true'
+const DRY_RUN_SETTING = (process.env.DRY_RUN ?? 'true').toLowerCase()
+const DRY_RUN = DRY_RUN_SETTING === 'true'
 const LOG_FILE = process.env.LOG_FILE ?? `${AGENT_ID}.log`
 const MAX_DEPOSIT_USD = process.env.AGENT_MAX_DEPOSIT_USD
   ? Number(process.env.AGENT_MAX_DEPOSIT_USD)
@@ -73,6 +76,7 @@ const STRATEGY_CONFIG: RangeStrategyConfig = {
 }
 
 const INTENT_FILE = process.env.INTENT_FILE ?? `${AGENT_ID}.intent.json`
+const intentJournal = new IntentJournal(INTENT_FILE)
 
 // Watchdog integration — writes a PID file on startup so external supervisors
 // (systemd Type=simple + a tailer, or a bash watchdog) can detect liveness.
@@ -82,6 +86,10 @@ const INTENT_FILE = process.env.INTENT_FILE ?? `${AGENT_ID}.intent.json`
 const WRITE_PID_FILE = (process.env.WRITE_PID_FILE ?? 'true').toLowerCase() !== 'false'
 const PID_FILE = process.env.PID_FILE ?? path.join(process.cwd(), 'agent.pid')
 
+if (!['true', 'false'].includes(DRY_RUN_SETTING) || !['mainnet', 'testnet'].includes(NETWORK)) {
+  console.error(`[${AGENT_ID}] DRY_RUN must be true or false and NETWORK must be mainnet or testnet`)
+  process.exit(1)
+}
 if (!POOL_ID) {
   console.error(`[${AGENT_ID}] CETUS_POOL_ID is required`)
   process.exit(1)
@@ -107,7 +115,7 @@ if (AGENT_MODE === 'active' && (!Number.isFinite(MAX_DEPOSIT_USD) || MAX_DEPOSIT
 type LogLevel = 'info' | 'event' | 'warn' | 'error'
 
 function log(level: LogLevel, message: string, data: Record<string, unknown> = {}): void {
-  const entry = { ts: new Date().toISOString(), agent: AGENT_ID, level, message, ...data }
+  const entry = { ts: new Date().toISOString(), agent: AGENT_ID, mode: AGENT_MODE, dryRun: DRY_RUN, level, message, ...data }
   const line = JSON.stringify(entry)
   console.log(line)
   try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
@@ -163,11 +171,8 @@ function parseWaapJson<T>(stdout: string): T {
 }
 
 async function whoami(): Promise<string> {
-  // Allow operators to skip the whoami session check by setting
-  // WAAP_AGENT_ADDRESS in env. Useful when the agent is deployed alongside a
-  // long-running waap-cli session (e.g. credentials in env, no interactive
-  // login) — `whoami --json` requires an active session that the agent
-  // wouldn't normally maintain.
+  // An explicit address selects the portfolio to observe. It supplies no
+  // signing authority; WaaP still requires an authenticated session and policy.
   const override = process.env.WAAP_AGENT_ADDRESS?.trim()
   if (override) return override
 
@@ -177,12 +182,6 @@ async function whoami(): Promise<string> {
     throw new Error('no Sui wallet address — set WAAP_AGENT_ADDRESS or run `waap-cli signup`')
   }
   return parsed.suiWalletAddress
-}
-
-interface WaapSendTxResult {
-  event?: string
-  txHash?: string
-  digest?: string
 }
 
 const DRY_RUN_DIGEST = 'DRY_RUN'
@@ -208,24 +207,27 @@ async function signAndSendTx(tx: Transaction, label = 'send_tx'): Promise<string
     await simulateTx(tx, label)
     return DRY_RUN_DIGEST
   }
-  const b64TxBytes = Buffer.from(await tx.build({ client: chain })).toString('base64')
-  const { stdout } = await execa(
-    'waap-cli',
-    ['send-tx', '--tx', b64TxBytes, '--tx-format', 'base64', '--chain', `sui:${NETWORK}`, '--json'],
-    { timeout: 120_000 },
-  )
+  const intent = readIntent()
+  if (!intent) throw new RecoveryRequiredError('Refusing submission without a durable intent')
+  if (intent.submission) throw new RecoveryRequiredError('An attempt already exists; reconcile before another submission')
+  const b64TxBytes = await encodeTransactionKind(tx, chain)
+  const submission = { label, kindSha256: createHash('sha256').update(Buffer.from(b64TxBytes, 'base64')).digest('hex') }
+  writeIntent({ ...intent, submission })
   try {
-    const parsed = parseWaapJson<WaapSendTxResult>(stdout)
-    return parsed.txHash ?? parsed.digest ?? null
-  } catch {
-    const m = stdout.match(/(?:Transaction submitted|TxHash|digest):\s*(\S+)/i)
-    return m ? m[1] : null
+    const { stdout } = await execa(
+      'waap-cli',
+      ['send-tx', '--tx', '-', '--tx-format', 'base64', '--chain', `sui:${NETWORK}`, '--json'],
+      { input: b64TxBytes, timeout: 120_000 },
+    )
+    const txHash = parseSubmissionReceipt(stdout)
+    writeIntent({ ...intent, submission: { ...submission, txHash } })
+    return txHash
+  } catch (cause) {
+    throw new RecoveryRequiredError('Submission outcome requires reconciliation; the intent is retained', { cause })
   }
 }
 
-// Simulate the tx via the v2 gRPC client and log effects + gas. Never throws —
-// dry-run is an observation tool; any error is reported and the caller
-// treats the submission as a no-op (returns DRY_RUN_DIGEST from signAndSendTx).
+// Simulate through gRPC. A failed or unavailable simulation must fail the cycle.
 async function simulateTx(tx: Transaction, label: string): Promise<void> {
   try {
     const res = await chain.simulateTransaction({
@@ -249,12 +251,14 @@ async function simulateTx(tx: Transaction, label: string): Promise<void> {
       log('info', 'dry_run_ok', { label, gas })
     } else {
       log('warn', 'dry_run_would_fail', { label, error })
+      throw new Error(`Simulation failed: ${error}`)
     }
   } catch (err) {
     log('error', 'dry_run_simulate_failed', {
       label,
       error: err instanceof Error ? err.message : String(err),
     })
+    throw err
   }
 }
 
@@ -405,87 +409,24 @@ async function getPositions(owner: string): Promise<Position[]> {
 // reconciling it on startup blocks that.
 // -----------------------------------------------------------------------------
 
-type IntentPhase = 'remove_pending' | 'open_pending' | 'initial_open_pending'
-
-interface RebalanceIntent {
-  phase: IntentPhase
-  ts: string
-  trigger: 'rebalance' | 'initial'
-  originalPosId?: string
-  removeTxHash?: string
-  plannedTickLower?: number
-  plannedTickUpper?: number
-  plannedSizingFraction?: number
+function writeIntent(intent: ExecutionIntent): void {
+  if (DRY_RUN) return // Simulations must never overwrite live recovery state.
+  intentJournal.write(intent)
+  log('info', 'intent_written', intent as unknown as Record<string, unknown>)
 }
 
-function writeIntent(intent: RebalanceIntent): void {
-  try {
-    fs.writeFileSync(INTENT_FILE, JSON.stringify(intent, null, 2))
-    log('info', 'intent_written', intent as unknown as Record<string, unknown>)
-  } catch (err) {
-    log('warn', 'intent_write_failed', { error: err instanceof Error ? err.message : String(err) })
-  }
-}
-
-function readIntent(): RebalanceIntent | null {
-  try {
-    if (!fs.existsSync(INTENT_FILE)) return null
-    return JSON.parse(fs.readFileSync(INTENT_FILE, 'utf8')) as RebalanceIntent
-  } catch (err) {
-    log('warn', 'intent_read_failed', { error: err instanceof Error ? err.message : String(err) })
-    return null
-  }
+function readIntent(): ExecutionIntent | null {
+  return intentJournal.read()
 }
 
 function clearIntent(): void {
-  try {
-    if (fs.existsSync(INTENT_FILE)) fs.unlinkSync(INTENT_FILE)
-  } catch {}
+  if (!DRY_RUN) intentJournal.clear()
 }
 
-// Called once at startup before entering the main loop. Three outcomes:
-//   - no intent / safe-to-clear intent → noop
-//   - open_pending + position now live  → clear; the open succeeded
-//   - open_pending + no live position   → REFUSE to continue; alert operator.
-//     Auto-replaying the open would risk depositing wildly different capital
-//     than originally planned (full balance × open fraction vs the planned
-//     fraction of pre-remove balance).
-async function reconcileIntent(owner: string): Promise<void> {
-  const intent = readIntent()
-  if (!intent) return
-  const positions = await getPositions(owner)
-  logEvent('intent_reconcile_start', {
-    intent: intent as unknown as Record<string, unknown>,
-    livePositions: positions.length,
-  })
-
-  if (intent.phase === 'remove_pending') {
-    // The remove either landed (no position) or never did (still there).
-    // Both are safe for the normal loop to resume from.
-    clearIntent()
-    logEvent('intent_reconcile_done', {
-      resolution: 'remove_pending_cleared',
-      livePositions: positions.length,
-    })
-    return
-  }
-
-  if (positions.length > 0) {
-    clearIntent()
-    logEvent('intent_reconcile_done', {
-      resolution: 'open_succeeded',
-      livePositions: positions.length,
-    })
-    return
-  }
-
-  // open_pending or initial_open_pending with no live position — refuse to
-  // auto-recover. Surface to the operator and exit non-zero so a supervisor
-  // (or a human reading the alert) decides what to do.
-  const critical = `crashed mid-open: intent=${intent.phase}, no live position. Inspect ${INTENT_FILE} and reconcile manually.`
-  log('error', 'intent_reconcile_critical', { message: critical, intent: intent as unknown as Record<string, unknown> })
-  await sendMatrixAlert(`CRITICAL: ${critical}`)
-  process.exit(2)
+async function reconcileIntent(_owner: string): Promise<void> {
+  // Position counts cannot prove the exact submission's result. Keep all pending
+  // intents until the operator independently reconciles and archives the evidence.
+  if (!DRY_RUN) intentJournal.assertClear()
 }
 
 // -----------------------------------------------------------------------------
@@ -510,15 +451,15 @@ function needsRebalance(position: Position, currentTick: number): boolean {
 }
 
 async function rebalance(owner: string, pool: PoolState, position: Position): Promise<void> {
+  if (!DRY_RUN) intentJournal.assertClear()
   logEvent('rebalance_start', { posId: position.posId })
 
   const balanceBefore = await getSuiBalance(owner)
   const usdcBefore = await getUsdcBalance(owner)
 
-  // Intent before remove — so a crash here is reconciled as a benign
-  // "either it landed or it didn't, just resume" on restart.
+  // Persist before constructing/submitting remove; a crash requires reconciliation.
   writeIntent({
-    phase: 'remove_pending',
+    phase: 'remove_pending', owner, poolId: POOL_ID!, network: NETWORK,
     trigger: 'rebalance',
     ts: new Date().toISOString(),
     originalPosId: position.posId,
@@ -560,7 +501,7 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
       status: removeFinality.status,
       error: removeFinality.error,
     })
-    return
+    throw new RecoveryRequiredError('Remove did not finalize successfully; intent retained')
   }
 
   const balanceAfterRemove = await getSuiBalance(owner)
@@ -589,7 +530,7 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
   // Promote the intent before submitting open. A crash here is the
   // dangerous case — operator-only reconciliation on restart.
   writeIntent({
-    phase: 'open_pending',
+    phase: 'open_pending', owner, poolId: POOL_ID!, network: NETWORK,
     trigger: 'rebalance',
     ts: new Date().toISOString(),
     originalPosId: position.posId,
@@ -615,7 +556,10 @@ async function rebalance(owner: string, pool: PoolState, position: Position): Pr
     insufficientLogMessage: 'insufficient_usdc_for_reopen',
     capExceededLogMessage: 'deposit_exceeds_max_usd_cap',
   })
-  if (!openTxHash) return
+  if (!openTxHash) {
+    if (!DRY_RUN) throw new RecoveryRequiredError('Remove finalized but replacement was skipped; review recovered funds before resuming')
+    return
+  }
   clearIntent()
 
   rebalanceCount++
@@ -743,12 +687,13 @@ async function openLiquidityFromDecision(
       status: openFinality.status,
       error: openFinality.error,
     })
-    return null
+    throw new RecoveryRequiredError('Open did not finalize successfully; intent retained')
   }
   return openTxHash
 }
 
 async function openInitialPosition(owner: string, pool: PoolState): Promise<void> {
+  if (!DRY_RUN) intentJournal.assertClear()
   const balances = {
     sui: await getSuiBalance(owner),
     usdc: await getUsdcBalance(owner),
@@ -772,7 +717,7 @@ async function openInitialPosition(owner: string, pool: PoolState): Promise<void
   // but the agent crashes before clearing, the next startup must NOT loop
   // back here and open a second position with the same fraction-of-balance.
   writeIntent({
-    phase: 'initial_open_pending',
+    phase: 'initial_open_pending', owner, poolId: POOL_ID!, network: NETWORK,
     trigger: 'initial',
     ts: new Date().toISOString(),
     plannedTickLower: decision.tickLower,
@@ -975,6 +920,7 @@ const MAX_CONSECUTIVE_ERRORS = 3
 let cycleCount = 0
 
 async function runCycle(owner: string | null): Promise<void> {
+  if (AGENT_MODE === 'active' && !DRY_RUN) intentJournal.assertClear()
   const pool = await getPoolState()
 
   // Track tick history for volatility
@@ -1061,6 +1007,11 @@ async function runCycle(owner: string | null): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (AGENT_MODE === 'active' && !DRY_RUN) {
+    const release = intentJournal.acquire()
+    process.on('exit', release)
+    intentJournal.assertClear()
+  }
   // Phase 1 (monitor) is read-only — no signup needed. Resolve the WaaP wallet
   // address only when active mode will submit transactions.
   const owner = AGENT_MODE === 'active' ? await whoami() : null
@@ -1113,6 +1064,9 @@ async function main(): Promise<void> {
       if (cycleCount % YIELD_SCAN_INTERVAL === 0) await scanYields()
       consecutiveErrors = 0
     } catch (err) {
+      if (err instanceof RecoveryRequiredError || (AGENT_MODE === 'active' && !DRY_RUN && readIntent())) {
+        throw err // Stop immediately; never retry an ambiguous economic effect.
+      }
       consecutiveErrors++
       const msg = err instanceof Error ? err.message : String(err)
       log('error', 'cycle_failed', { error: msg, consecutiveErrors })
