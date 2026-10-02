@@ -46,3 +46,7 @@ Before publishing, an authorised npm maintainer must verify scope ownership, ver
 [Trusted publishing](https://docs.npmjs.com/trusted-publishers/) can provide short-lived GitHub Actions authentication and automatic provenance after a maintainer configures the exact publishing workflow on npm. The candidate workflow is not a trusted publisher. Do not claim npm provenance for a locally published tarball merely because it has a hash manifest or was downloaded from CI. For a first package publication, confirm the organisation's bootstrap procedure before treating public lookup failure as permission to create it.
 
 After publication, download each exact version from npm, compare its `dist.integrity` against the manifest, inspect the registry's provenance/signatures, and repeat the fresh generated-project and profile checks. Keep the source-only and published-install instructions distinct until this passes.
+
+### Reproducible candidate builds
+
+Release preparation sets `SOURCE_DATE_EPOCH` to the selected Git commit time, records it in the manifest and uses it for the bundled registry timestamp. Development builds without this variable retain a current build timestamp. Invalid explicit epochs fail rather than silently using the clock. The release script rebuilds and repacks each package twice and requires identical tarball bytes on that runner. Different platform compression implementations may produce different gzip bytes for identical tar contents; publish and verify the selected CI tarball itself instead of repacking it on another machine.

@@ -18,8 +18,10 @@ function run(bin, args, cwd = root, env = process.env) {
 if (run('git', ['status', '--porcelain']).length) throw new Error('Commit or isolate changes before preparing a release')
 const revision = run('git', ['rev-parse', 'HEAD'])
 const tree = run('git', ['rev-parse', 'HEAD^{tree}'])
+const sourceDateEpoch = run('git', ['show', '-s', '--format=%ct', 'HEAD'])
+const buildEnv = { ...process.env, SOURCE_DATE_EPOCH: sourceDateEpoch }
 mkdirSync(output)
-const manifest = { schemaVersion: 1, revision, tree, node: process.version, npm: run('npm', ['--version']), packages: [] }
+const manifest = { schemaVersion: 1, revision, tree, sourceDateEpoch, node: process.version, npm: run('npm', ['--version']), packages: [] }
 const scratch = mkdtempSync(join(tmpdir(), 'aex-release-consumer-'))
 const npmrc = join(scratch, 'npmrc')
 writeFileSync(npmrc, '')
@@ -33,7 +35,7 @@ try {
     const lock = JSON.parse(readFileSync(join(directory, 'package-lock.json'), 'utf8'))
     if (pkg.version !== lock.version || pkg.version !== lock.packages[''].version) throw new Error(`${name}: package/lock version mismatch`)
     if (pkg.repository.url !== 'https://github.com/holonym-foundation/agent-exchange.git') throw new Error(`${name}: wrong public repository`)
-    run('npm', ['run', 'build'], directory)
+    run('npm', ['run', 'build'], directory, buildEnv)
     const [packed] = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', output], directory))
     if (packed.filename !== basename(packed.filename)) throw new Error('Unexpected tarball filename')
     const files = packed.files.map(file => file.path)
@@ -54,6 +56,13 @@ try {
     const bytes = readFileSync(artifact)
     const integrity = 'sha512-' + createHash('sha512').update(bytes).digest('base64')
     if (integrity !== packed.integrity) throw new Error(`${name}: npm integrity mismatch`)
+    // Rebuild and repack on this runner; keep the first, already-inspected artifact.
+    // Compression implementations can differ across OS builds, so compare exact bytes here.
+    const repeatedOutput = join(scratch, `${name}-repeat`)
+    mkdirSync(repeatedOutput)
+    run('npm', ['run', 'build'], directory, buildEnv)
+    run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', repeatedOutput], directory)
+    if (!readFileSync(join(repeatedOutput, packed.filename)).equals(bytes)) throw new Error(`${name}: repeated build produced different package bytes`)
     const consumer = join(scratch, name)
     mkdirSync(consumer)
     run('npm', ['install', '--ignore-scripts', artifact], consumer, consumerEnv)
@@ -61,7 +70,7 @@ try {
     const reported = run(process.execPath, [join(installed, 'dist/index.js'), '--version'], consumer, consumerEnv)
     if (reported !== pkg.version) throw new Error(`${name}: installed CLI reports ${reported}, package says ${pkg.version}`)
     manifest.packages.push({ name: pkg.name, version: pkg.version, filename: packed.filename, integrity,
-      sha256: createHash('sha256').update(bytes).digest('hex'), files: files.length, installedVersion: reported })
+      sha256: createHash('sha256').update(bytes).digest('hex'), files: files.length, installedVersion: reported, repeatedBuildIdentical: true })
     console.log(`✓ ${pkg.name}@${pkg.version}: packed, installed, version verified`)
   }
   if (run('git', ['rev-parse', 'HEAD']) !== revision || run('git', ['status', '--porcelain'])) throw new Error('Source changed while preparing artifacts')

@@ -63,9 +63,20 @@ export async function buildRegistry(opts: BuildOptions): Promise<void> {
 
   activities.sort((a, b) => a.slug.localeCompare(b.slug))
 
+  const epoch = process.env.SOURCE_DATE_EPOCH
+  let generatedAt = new Date().toISOString()
+  if (epoch !== undefined) {
+    const seconds = Number(epoch)
+    const date = new Date(seconds * 1000)
+    if (!/^[0-9]+$/.test(epoch) || !Number.isSafeInteger(seconds) || !Number.isFinite(date.getTime())) {
+      throw new Error('SOURCE_DATE_EPOCH must be a nonnegative integer Unix timestamp within the supported date range')
+    }
+    generatedAt = date.toISOString()
+  }
+
   const registry = {
     version: opts.version ?? '0.1.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     activities,
   }
 
