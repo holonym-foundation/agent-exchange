@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import packageJson from '../package.json'
 import { addCommand } from './commands/add.js'
 import { applyCommand } from './commands/apply.js'
 import { autopayCommand } from './commands/autopay.js'
@@ -23,7 +24,7 @@ export function cliEntry(): void {
   program
     .name('aex-fleet')
     .description('Multi-agent operator CLI for WaaP wallets')
-    .version('0.0.1')
+    .version(packageJson.version)
     .enablePositionalOptions() // required for `waap` and `exec` to pass options through verbatim
 
   program.addCommand(addCommand())

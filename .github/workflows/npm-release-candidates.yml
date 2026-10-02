@@ -1,0 +1,42 @@
+name: npm release candidates
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'scripts/prepare-npm-release.mjs'
+      - '.github/workflows/npm-release-candidates.yml'
+permissions:
+  contents: read
+jobs:
+  candidates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Verify recipes and actual generated consumers
+        working-directory: packages/create-agent-wallet
+        run: |
+          npm ci
+          npm run check
+          npm run check:consumers
+      - name: Verify fleet and published WaaP compatibility
+        working-directory: packages/aex-fleet
+        run: |
+          npm ci
+          npm run type-check
+          npm test
+          npm run build
+          npm audit --audit-level=high
+      - name: Package and install exact release candidates
+        run: node scripts/prepare-npm-release.mjs "$RUNNER_TEMP/aex-npm-release"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aex-npm-release-${{ github.sha }}
+          path: ${{ runner.temp }}/aex-npm-release/
+          if-no-files-found: error
+          retention-days: 30
