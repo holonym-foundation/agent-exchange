@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { mkdir, writeFile, readFile, rm, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
@@ -36,6 +36,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -81,6 +82,20 @@ describe('buildRegistry', () => {
     await expect(buildRegistry({ root, out })).rejects.toThrow(
       /does not match directory name/
     )
+  })
+
+  it('reproduces registry bytes using the source epoch despite different build times', async () => {
+    vi.stubEnv('SOURCE_DATE_EPOCH', '1767225600')
+    await buildRegistry({ root, out })
+    const first = await readFile(out, 'utf8')
+    expect(JSON.parse(first).generatedAt).toBe('2026-01-01T00:00:00.000Z')
+    await buildRegistry({ root, out })
+    expect(await readFile(out, 'utf8')).toBe(first)
+  })
+
+  it.each(['', '-1', '1.5', 'invalid', '999999999999999999999999'])('rejects invalid source epoch %j', async epoch => {
+    vi.stubEnv('SOURCE_DATE_EPOCH', epoch)
+    await expect(buildRegistry({ root, out })).rejects.toThrow('SOURCE_DATE_EPOCH')
   })
 
   it('accepts a custom version', async () => {
