@@ -62,33 +62,12 @@ describe('registry coverage', () => {
 
   it('ships the expected template-class activities', async () => {
     const { template } = await classify()
-    expect(template).toEqual([
-      'blank-project',
-      'cetus-yield-agent',
-      'cicd-agent',
-      'evm-portfolio-rebalancer',
-      'evm-trading-smart-money-rotator',
-      'evm-uniswap-rebalancer',
-      'morpho-yield-agent',
-      'polymarket-agent',
-      'polymarket-arbitrage',
-      'polymarket-llm-analyst',
-      'recurring-payments',
-      'snapshot-agent',
-      'sui-portfolio-rebalancer'
-    ])
+    expect(template).toEqual(['cetus-yield-agent'])
   })
 
   it('ships the expected profile-class activities', async () => {
     const { profile } = await classify()
-    expect(profile).toEqual([
-      'autoresearch',
-      'dca-accumulator',
-      'gas-claims-reminder',
-      'gem-hunter',
-      'privacy-guard',
-      'security-guard'
-    ])
+    expect(profile).toEqual([])
   })
 
   it('every activity.json validates against the schema', async () => {
@@ -152,6 +131,24 @@ describe('registry coverage', () => {
           expect(present, `${slug}/${runtime} missing ${f}`).toContain(f)
         }
       }
+    }
+  })
+
+  it('documents every standalone env key in activity.json', async () => {
+    const { template } = await classify()
+    for (const slug of template) {
+      const raw = JSON.parse(
+        await readFile(resolve(REGISTRY, slug, 'activity.json'), 'utf8')
+      )
+      const documented = new Set(raw.envVars.map((entry: { key: string }) => entry.key))
+      const envTemplate = await readFile(
+        resolve(REGISTRY, slug, 'templates/standalone/dot-env.example'),
+        'utf8'
+      )
+      const configured = [...envTemplate.matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=/gm)]
+        .map((match) => match[1])
+      const missing = configured.filter((key) => !documented.has(key))
+      expect(missing, `${slug} has undocumented standalone env keys`).toEqual([])
     }
   })
 })

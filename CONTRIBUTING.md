@@ -46,25 +46,28 @@ If you forget to sign off, you can amend with `git commit --amend --signoff` and
 
 ## Adding a new starter agent (Activity)
 
-The fastest path is the [`caw-add-activity`](.claude/skills/caw-add-activity/SKILL.md) maintainer skill, which scaffolds all required files across the four runtime adapters (Claude, Standalone, OpenClaw, Nous/Hermes).
-
-Manual path: copy an existing activity in `packages/create-agent-wallet/registry/activities/` as a starting point, write your `activity.json`, and follow the naming convention below.
+Everything required to contribute a recipe is public. Start with
+[`packages/create-agent-wallet/CONTRIBUTING-ACTIVITY.md`](packages/create-agent-wallet/CONTRIBUTING-ACTIVITY.md),
+copy an existing activity, and use the repository's validation command. A contribution
+must not depend on a private skill, internal ticket, or undocumented maintainer step.
 
 ### Naming convention
 
-Activity slugs follow the pattern: `[chain]-[protocol_or_category]-[action][-framework?]`
+For new activities, prefer `[chain]-[protocol]-[action]`. Existing imported recipes may
+retain their established slug so links and contribution history remain stable.
 
 Rules:
 
 - All lowercase
 - Segments separated by `-` (dash)
-- Multi-word tokens within a segment use `_` (underscore) — e.g., `yield_optimizer`, `governance_voter`
+- Use dashes throughout; underscores are not accepted by the schema
 - Chain prefix first: `evm`, `sui`, `solana`, `stellar`, or `any` (chain-agnostic only)
 - Protocol or category second: `morpho`, `polymarket`, `cetus`, `aave`, `snapshot`, `uniswap`, or a category like `trading`, `governance`
-- Action last: the agent's verb — `yield_optimizer`, `rebalancer`, `prediction`, `governance_voter`
+- Action last: the agent's verb — `yield-optimizer`, `rebalancer`, `prediction`, `governance-voter`
 - Framework variant optional: `-langchain`, `-elizaos`, etc.
 
-Examples: `evm-morpho-yield_optimizer`, `sui-cetus-yield_optimizer`, `evm-snapshot-governance_voter`, `evm-polymarket-prediction-langchain`.
+Examples: `evm-morpho-yield-optimizer`, `sui-cetus-yield-optimizer`,
+`evm-snapshot-governance-voter`, `evm-polymarket-prediction-langchain`.
 
 This slug is canonical across:
 
@@ -72,11 +75,13 @@ This slug is canonical across:
 - CLI: `npx @human.tech/create-agent-wallet --activity <slug>`
 - AEX registry entry: `{ "id": "<slug>" }`
 - EIP-8004 registration display name
-- Internal-docs `starters/<slug>.md` path
+- Public recipe and generated-project links
 
 ### Required fields in `activity.json`
 
-See an existing activity (e.g., `cetus-yield-agent/activity.json`) as a reference. Required fields include `slug`, `name`, `description`, `version`, `author`, `chain`, `category`, `protocols`, `runtimes`, `envVars`, `waapFeatures`, and the `eip8004` block.
+See `cetus-yield-agent/activity.json` as a reference. The authoritative schema is
+[`src/registry/types.ts`](packages/create-agent-wallet/src/registry/types.ts); the
+activity guide explains each required field and the verification lifecycle.
 
 Safety rails are user-specified — don't invent default spend caps. If your agent moves money, declare a hard cap env var (e.g., `AGENT_MAX_DEPOSIT_USD` or `AGENT_MAX_ORDER_USD`) and document it in `envVars` with `required: true`.
 
@@ -89,11 +94,16 @@ Safety rails are user-specified — don't invent default spend caps. If your age
 
 ## Tests
 
-PRs that change CLI behavior or activity schemas need passing tests. Run the existing suite (see the relevant package's `README.md`). The weekly template-health workflow smoke-tests every activity × runtime cell — your activity should pass before being added to the registry.
+From `packages/create-agent-wallet`, run `npm ci` and `npm run check`. CI runs the same
+type-check, unit/integration suite, registry build, and every activity × runtime
+scaffold. To iterate on one recipe, run
+`npm run validate:activity -- <activity-slug>`.
 
 ## Reviewing
 
-Maintainers can use the [`caw-audit`](.claude/skills/caw-audit/SKILL.md) skill to run the 8-category registry health check on a contribution.
+Reviewers use the public quality bar and PR checklist. An activity becomes
+`verified: true` only after a maintainer reproduces its safe-mode smoke test against
+the documented chain/app and records the result in the PR.
 
 ## Trademark
 

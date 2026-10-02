@@ -8,15 +8,17 @@ npx @human.tech/create-agent-wallet
 
 Interactive prompts pick an **Activity** (what the agent does), a **runtime** (Claude, Standalone, OpenClaw, or Nous/Hermes Agent), and a **project name**. The generator stamps out a working project — you `cd` in, copy `.env.example`, and run.
 
-Part of the [Agent Exchange (AEX)](https://github.com/holonym-foundation/aex).
+Part of the [Agent Exchange (AEX)](https://github.com/holonym-foundation/agent-exchange).
 
 ## Features
 
 - **4 runtimes:** Claude (SKILL.md + CLAUDE.md + MCP config), Standalone (Node.js + Dockerfile), OpenClaw (AgentSkills SKILL.md), and Nous / Hermes Agent (AgentSkills SKILL.md). OpenClaw + Nous share the [AgentSkills open standard](https://agentskills.io/) so the same SKILL.md works across both (and any other AgentSkills-compatible runtime).
-- **Curated Activity registry:** 11 launch templates plus a Blank Project scaffold — Polymarket Signal Trader, Polymarket Arbitrage, Polymarket LLM Analyst, Snapshot Governance, Cetus Yield, Morpho Yield, EVM Uniswap Rebalancer, EVM Portfolio Rebalancer, Sui Portfolio Rebalancer, Recurring Payments, CI/CD Agent.
+- **Public Activity registry:** currently ships the Cetus Yield Agent as the first
+  reference recipe. New recipes are added through the public contribution contract.
 - **Session bootstrapping:** detects `~/.waap-cli/session.json`; prompts inline if absent.
 - **Non-interactive mode:** full flag-based usage for CI / agent orchestration.
-- **Offline-capable:** bundled registry fallback if `docs.waap.xyz` is unreachable.
+- **Offline-capable:** the release contains its registry and templates; an explicit
+  remote registry remains available for development and testing.
 - **[EIP-8004](https://eips.ethereum.org/EIPS/eip-8004) ready:** every scaffolded project ships a valid `agent-registration.json` (plus `.well-known/agent-registration.json` for standalone) so the agent is discoverable the moment an Identity Registry contract is deployed.
 
 ## Usage
@@ -31,7 +33,7 @@ npx @human.tech/create-agent-wallet
 
 ```bash
 npx @human.tech/create-agent-wallet \
-  --activity polymarket-agent \
+  --activity cetus-yield-agent \
   --runtime standalone \
   --no-session \
   --yes \
@@ -70,7 +72,7 @@ npx @human.tech/create-agent-wallet \
 
 ```
 my-agent/
-├── package.json              pnpm/npm ready, tsx + execa
+├── package.json              npm ready, tsx + execa
 ├── agent.ts                  your loop — shells out to waap-cli
 ├── Dockerfile                production container
 ├── tsconfig.json
@@ -143,15 +145,16 @@ Activities live in [`registry/activities/`](./registry/activities). Each directo
 - `README.md` — human description (rendered into docs site)
 - `templates/<runtime>/` — files copied on scaffold
 
-A build step aggregates per-activity `activity.json` files into a single `registry.json` published at `docs.waap.xyz/registry.json`. The CLI fetches this once per 24h and caches locally at `~/.create-agent-wallet/registry.json`.
+A build step aggregates per-activity `activity.json` files into `dist/registry.json` and bundles it with the published package. The CLI uses that bundled registry by default, so scaffolding does not depend on a separately hosted registry endpoint. An explicit `--registry` URL can still override it.
 
 ## Contributing an Activity
 
-See [CONTRIBUTING-ACTIVITY.md](./CONTRIBUTING-ACTIVITY.md).
+See [CONTRIBUTING-ACTIVITY.md](./CONTRIBUTING-ACTIVITY.md). The one-command local gate is:
 
-## Design doc
-
-See [docs/plans/002-create-agent-wallet-cli-design-plan-2026-04-20.md](../../docs/plans/002-create-agent-wallet-cli-design-plan-2026-04-20.md).
+```bash
+npm ci
+npm run check
+```
 
 ## License
 

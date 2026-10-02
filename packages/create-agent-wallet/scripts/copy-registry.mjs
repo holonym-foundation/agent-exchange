@@ -3,11 +3,10 @@
  * Post-build step:
  *   1. Assemble dist/registry/ from the monorepo agents/ directory (primary)
  *      or the local registry/activities/ fallback.
- *   2. Copy registry/build/ into dist/registry/build/ (needed by the builder).
- *   3. Run the TypeScript registry builder via tsx to produce
+ *   2. Run the TypeScript registry builder via tsx to produce
  *      dist/registry.json (offline fallback for `npx`).
  */
-import { cp, rm, mkdir, readdir, stat } from 'node:fs/promises'
+import { cp, rm, mkdir, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -34,12 +33,6 @@ if (!existsSync(agentsRoot)) {
 await rm(distRegistry, { recursive: true, force: true })
 await mkdir(distActivities, { recursive: true })
 
-// Copy registry/build/ into dist/registry/build/ (needed by the builder script)
-const buildDir = resolve(pkgRoot, 'registry/build')
-if (existsSync(buildDir)) {
-  await cp(buildDir, resolve(distRegistry, 'build'), { recursive: true })
-}
-
 // Copy each agent directory that has activity.json + templates/
 const entries = await readdir(agentsRoot, { withFileTypes: true })
 let copied = 0
@@ -57,9 +50,10 @@ for (const entry of entries) {
 }
 console.log(`✓ copied ${copied} activities from ${agentsRoot} → dist/registry/activities`)
 
-// Run the TS builder via tsx — keeps schema + build logic in one TS file.
+// Run the TS builder through Node's tsx import hook. This avoids `npx` network
+// resolution and the tsx CLI's IPC socket, which is unavailable in some sandboxes.
 const builder = resolve(pkgRoot, 'registry/build/build-registry.ts')
-const result = spawnSync('npx', ['tsx', builder], {
+const result = spawnSync(process.execPath, ['--import', 'tsx', builder], {
   cwd: pkgRoot,
   stdio: 'inherit'
 })

@@ -51,6 +51,7 @@ export async function run(opts: RunOptions): Promise<void> {
   s.stop(`Loaded ${registry.activities.length} activities`)
 
   const activity = await pickActivity(registry.activities, opts)
+  assertMinCliVersion(activity, opts.cliVersion)
   const runtime = await pickRuntime(activity, opts)
   const projectName = await pickProjectName(activity, opts)
   const session = await resolveSession(opts)
@@ -89,6 +90,24 @@ export async function run(opts: RunOptions): Promise<void> {
   const nextSteps = buildNextSteps(projectName, runtime, session)
   note(nextSteps, 'Next steps')
   outro(`Done → ./${projectName}`)
+}
+
+export function assertMinCliVersion(activity: Activity, cliVersion: string): void {
+  if (compareSemver(cliVersion, activity.minCliVersion) < 0) {
+    throw new CawError(
+      `activity ${activity.slug} requires create-agent-wallet ${activity.minCliVersion} or newer; current version is ${cliVersion}`,
+      ExitCodes.INVALID_ARGS,
+    )
+  }
+}
+
+function compareSemver(left: string, right: string): number {
+  const a = left.split('.').map(Number)
+  const b = right.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] - b[i]
+  }
+  return 0
 }
 
 async function pickActivity(
@@ -193,8 +212,12 @@ function buildNextSteps(
   if (runtime === 'standalone') {
     lines.push('npm install')
     lines.push('npm run dev')
-  } else {
+  } else if (runtime === 'claude') {
     lines.push('# Open this folder in Claude Code to discover the skill')
+  } else if (runtime === 'openclaw') {
+    lines.push('# Copy or symlink this folder into ~/.openclaw/workspace/skills/')
+  } else {
+    lines.push('# Import SKILL.md through the Hermes Agent Skills Hub')
   }
   return lines.join('\n')
 }

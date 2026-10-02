@@ -1,0 +1,193 @@
+{
+  "slug": "cetus-yield-agent",
+  "name": "Cetus Yield Agent",
+  "description": "Autonomous concentrated-liquidity agent on Cetus Protocol (Sui). Phase 1 monitors pool prices read-only; Phase 2+ opens positions, earns trading fees, and auto-repositions when the price drifts out of range.",
+  "version": "0.2.0",
+  "author": "holonym-foundation",
+  "verified": true,
+  "chain": { "family": "sui", "id": 1, "name": "Sui Mainnet" },
+  "category": "yield",
+  "protocols": ["cetus"],
+  "tags": ["yield", "defi", "clmm", "sui"],
+  "runtimes": ["claude", "standalone", "openclaw", "nous"],
+  "envVars": [
+    {
+      "key": "CETUS_POOL_ID",
+      "required": true,
+      "description": "Cetus pool object ID (e.g. SUI/USDC: 0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105)"
+    },
+    {
+      "key": "AGENT_MODE",
+      "required": false,
+      "default": "monitor",
+      "description": "`monitor` (read-only, no funds at risk - Phase 1) or `active` (opens + rebalances real positions - Phase 2+)"
+    },
+    {
+      "key": "POSITION_RANGE_TICKS",
+      "required": false,
+      "default": "200",
+      "description": "Half-width of the position's tick range around the current tick"
+    },
+    {
+      "key": "REBALANCE_THRESHOLD_TICKS",
+      "required": false,
+      "default": "100",
+      "description": "Drift in ticks from position centre before triggering a rebalance"
+    },
+    {
+      "key": "CHECK_INTERVAL_MS",
+      "required": false,
+      "default": "300000",
+      "description": "Milliseconds between pool checks (default 5 minutes per recipe)"
+    },
+    {
+      "key": "NETWORK",
+      "required": false,
+      "default": "mainnet",
+      "description": "Sui network: `mainnet` or `testnet`"
+    },
+    {
+      "key": "SUI_RPC",
+      "required": false,
+      "description": "Sui gRPC endpoint (defaults to https://fullnode.<NETWORK>.sui.io:443)"
+    },
+    {
+      "key": "AGENT_MAX_DEPOSIT_USD",
+      "required": true,
+      "description": "Hard cap on the estimated total USD value of both SUI and USDC deposited when opening or reopening. Active mode refuses to start without a positive value."
+    },
+    {
+      "key": "DRY_RUN",
+      "required": false,
+      "default": "true",
+      "description": "If `true`, simulate every tx via Sui gRPC instead of submitting via waap-cli. Logs effects + gas so operators can verify a planned action before going live."
+    },
+    {
+      "key": "INTENT_FILE",
+      "required": false,
+      "description": "Path to the rebalance intent file used for crash-recovery reconciliation (default: `<projectName>.intent.json` in cwd)"
+    },
+    {
+      "key": "LOG_FILE",
+      "required": false,
+      "description": "Optional path for a JSON-line log file (default: `<projectName>.log` in cwd)"
+    },
+    {
+      "key": "VOLATILITY_WINDOW",
+      "required": false,
+      "default": "60",
+      "description": "Number of recent cycles used to estimate tick volatility"
+    },
+    {
+      "key": "MIN_RANGE_TICKS",
+      "required": false,
+      "default": "100",
+      "description": "Minimum adaptive position half-width in ticks"
+    },
+    {
+      "key": "MAX_RANGE_TICKS",
+      "required": false,
+      "default": "400",
+      "description": "Maximum adaptive position half-width in ticks"
+    },
+    {
+      "key": "VOLATILITY_MULTIPLIER",
+      "required": false,
+      "default": "3.0",
+      "description": "Multiplier applied to observed tick volatility when selecting the range"
+    },
+    {
+      "key": "MIN_SAMPLES_FOR_ADAPTIVE",
+      "required": false,
+      "default": "10",
+      "description": "Minimum tick samples required before adaptive ranges activate"
+    },
+    {
+      "key": "USDC_OPEN_FRACTION",
+      "required": false,
+      "default": "0.40",
+      "description": "Fraction of available USDC considered for an initial position, still bounded by the USD cap"
+    },
+    {
+      "key": "USDC_REOPEN_FRACTION",
+      "required": false,
+      "default": "0.50",
+      "description": "Fraction of available USDC considered when reopening, still bounded by the USD cap"
+    },
+    {
+      "key": "SUI_GRPC_URL",
+      "required": false,
+      "description": "Alias for the Sui gRPC endpoint; SUI_RPC takes precedence"
+    },
+    {
+      "key": "USDC_TYPE",
+      "required": false,
+      "description": "Override the default Sui USDC coin type"
+    },
+    {
+      "key": "ESTIMATED_GAS_SUI",
+      "required": false,
+      "default": "0.01",
+      "description": "Estimated SUI gas per transaction used for local cumulative telemetry"
+    },
+    {
+      "key": "WAAP_AGENT_ADDRESS",
+      "required": false,
+      "description": "Optional Sui wallet address override for non-interactive WaaP hosts"
+    },
+    {
+      "key": "YIELD_SCAN_INTERVAL",
+      "required": false,
+      "default": "6",
+      "description": "Run the cross-protocol yield scan every N agent cycles"
+    },
+    {
+      "key": "STARTUP_COOLDOWN_MS",
+      "required": false,
+      "default": "60000",
+      "description": "Delay before active mode may open a position after startup"
+    },
+    {
+      "key": "WRITE_PID_FILE",
+      "required": false,
+      "default": "true",
+      "description": "Write a PID file for external supervisor liveness checks"
+    },
+    {
+      "key": "PID_FILE",
+      "required": false,
+      "description": "Override the supervisor PID-file path"
+    },
+    {
+      "key": "MATRIX_HOMESERVER",
+      "required": false,
+      "description": "Optional Matrix homeserver for operational alerts"
+    },
+    {
+      "key": "MATRIX_ACCESS_TOKEN",
+      "required": false,
+      "description": "Optional Matrix access token; keep it only in the local .env or a secret manager"
+    },
+    {
+      "key": "MATRIX_ALERT_ROOM",
+      "required": false,
+      "description": "Optional Matrix room ID for error and rebalance alerts"
+    }
+  ],
+  "waapFeatures": ["send-tx", "policy"],
+  "recipeUrl": "https://docs.wallet.human.tech/recipes/cetus-yield-agent",
+  "minCliVersion": "0.1.0",
+  "eip8004": {
+    "supportedTrust": ["tee-attestation", "reputation"],
+    "x402Support": false,
+    "services": [
+      {
+        "type": "A2A",
+        "endpointTemplate": "https://{{host}}/a2a",
+        "version": "0.1",
+        "skills": ["yield-optimization", "cetus", "clmm"],
+        "domains": ["cetus.zone"]
+      }
+    ]
+  }
+}
