@@ -4,7 +4,7 @@ import { passthroughExec } from '../core/waap-runner.js'
 
 export function execCommand(): Command {
   return new Command('exec')
-    .description("Run an arbitrary command inside the active agent's HOME sandbox")
+    .description("Run trusted local code using the active agent's WaaP session directory")
     .argument('<cmd>', 'binary to run (resolved via PATH)')
     .argument('[args...]', 'arguments passed through verbatim')
     .allowUnknownOption(true)

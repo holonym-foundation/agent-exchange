@@ -1,5 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { getConfigDir } from './config.js'
 
 // v1 ships file-backed storage under $XDG_CONFIG_HOME/aex-fleet/sessions/<agent-id>/session.json
@@ -10,7 +10,18 @@ import { getConfigDir } from './config.js'
 export type SessionMaterial = Record<string, unknown>
 
 export function sessionDir(agentId: string): string {
-  return join(getConfigDir(), 'sessions', agentId)
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(agentId)) {
+    throw new Error('Agent ID must be a single filename component starting with a letter or digit')
+  }
+  return resolve(getConfigDir(), 'sessions', agentId)
+}
+
+/** Shared directly with WaaP: do not copy sessions in or out after a command. */
+export function ensureSessionDir(agentId: string): string {
+  const dir = sessionDir(agentId)
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  chmodSync(dir, 0o700)
+  return dir
 }
 
 export function sessionPath(agentId: string): string {
@@ -28,8 +39,7 @@ export function readSession(agentId: string): SessionMaterial | undefined {
 }
 
 export function writeSession(agentId: string, session: SessionMaterial): void {
-  const dir = sessionDir(agentId)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 })
+  ensureSessionDir(agentId)
   const p = sessionPath(agentId)
   writeFileSync(p, JSON.stringify(session, null, 2), { mode: 0o600 })
   chmodSync(p, 0o600)

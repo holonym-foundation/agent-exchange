@@ -1,0 +1,26 @@
+name: fleet WaaP compatibility
+on:
+  push:
+    branches: [main]
+    paths: ['packages/aex-fleet/**', '.github/workflows/fleet-waap-compat.yml']
+  pull_request:
+    paths: ['packages/aex-fleet/**', '.github/workflows/fleet-waap-compat.yml']
+permissions:
+  contents: read
+jobs:
+  profiles:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/aex-fleet
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/aex-fleet/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test
+      - run: npm run build

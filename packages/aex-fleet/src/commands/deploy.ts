@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import pc from 'picocolors'
 import { FleetManager } from '../core/FleetManager.js'
 import { getProvider, type DeploySpec, type ProviderName } from '../core/providers/index.js'
-import { sandboxDir } from '../core/waap-runner.js'
+import { sessionDir, ensureSessionDir } from '../core/keychain.js'
 
 /**
  * `aex-fleet deploy` — ship an agent onto a compute backend through the provider abstraction.
@@ -61,12 +61,13 @@ Examples:
         if (!pf.ok) throw new Error(pf.detail ?? `${target} preflight failed`)
       }
 
-      // Inject the agent's WaaP wallet so the deployed agent signs through it. For the local target
-      // we also point HOME at the fleet sandbox so waap-cli finds this agent's session. Shipping the
-      // session to a remote VM (Arkhai) is the provider secrets-injection seam — see deployment.md.
+      // Local trusted code shares this agent's canonical WaaP profile. Remote providers
+      // require their own credential delivery; a wallet address does not grant signing authority.
       const env: Record<string, string> = { ...opts.env }
       if (agent.address) env.WAAP_AGENT_ADDRESS = agent.address
-      if (target === 'local') env.HOME = sandboxDir(agentId)
+      if (target === 'local') {
+        env.WAAP_CLI_SESSION_DIR = opts.dryRun ? sessionDir(agentId) : ensureSessionDir(agentId)
+      }
       if (process.env.AEX_INGEST_URL) env.AEX_INGEST_URL = process.env.AEX_INGEST_URL
       if (process.env.AEX_INGEST_KEY) env.AEX_INGEST_KEY = process.env.AEX_INGEST_KEY
 
