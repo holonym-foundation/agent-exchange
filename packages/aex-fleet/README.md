@@ -15,7 +15,7 @@ Wraps [`@human.tech/waap-cli`](https://www.npmjs.com/package/@human.tech/waap-cl
 | `aex-fleet use` | Set the active agent for subsequent commands |
 | `aex-fleet rm` | Remove an agent from the registry (wallet untouched) |
 | `aex-fleet waap …` | Pass through to `waap-cli` scoped to the active agent |
-| `aex-fleet exec …` | Run an arbitrary command in the active agent's HOME sandbox |
+| `aex-fleet exec …` | Run trusted local code with the active agent's WaaP profile |
 | `aex-fleet policy get/set` | Inspect / set policy in bulk via `--all`, `--tag`, `--agent` |
 | `aex-fleet autopay enable/disable/pause/resume/status` | Arm policy-bounded buyer autopay (auto-buy + auto-renew the compute lease, #1256) |
 | `aex-fleet renew [--watch]` | Renewal loop — re-buy near-expiry leases within the consented cap (one-shot or daemon) |
@@ -33,7 +33,7 @@ The `SKILL.md` at the package root + the `templates/claude-code/CLAUDE.md` proje
 
 ```bash
 # Install
-npm install -g @human.tech/aex-fleet @human.tech/waap-cli
+npm install -g @human.tech/aex-fleet @human.tech/waap-cli@2.2.1
 
 # Preflight
 aex-fleet doctor
@@ -101,7 +101,8 @@ Data root: `$XDG_CONFIG_HOME/aex-fleet/` (or platform default on macOS / Windows
 $AEX_FLEET_HOME/
   fleet.json                                       # registry (mode 0600)
   sessions/<agent-id>/session.json                 # waap-cli session material (mode 0600)
-  sandboxes/<agent-id>/.waap-agent/session.json    # materialised per-spawn
+  sessions/<agent-id>/pending-registration.json   # resumable WaaP signup, when present
+  sandboxes/<agent-id>/.lock                      # fleet command lock only
 ```
 
 Override the whole data root with `AEX_FLEET_HOME=/path/to/dir`. Useful for isolating a test instance or pinning multiple operator profiles on one machine.
@@ -118,22 +119,31 @@ Override the whole data root with `AEX_FLEET_HOME=/path/to/dir`. Useful for isol
 
 ## Architecture mechanics
 
-- **Per-agent scoping**: each `aex-fleet waap …` spawn overrides `HOME` to a per-agent sandbox dir so `waap-cli`'s `~/.waap-agent/session.json` is scoped. Filing an upstream `WAAP_CONFIG_DIR` request to retire this trick.
-- **Credentials**: session material lives in the file store with mode `0600`. `keytar` was deprecated; swap in `@napi-rs/keyring` (or successor) when stable — the `core/keychain.ts` surface is the swap point.
+- **Per-agent scoping**: capture, passthrough, `exec` and local deployment set `WAAP_CLI_SESSION_DIR` to the agent's canonical `sessions/<agent-id>` directory. An inherited operator setting cannot override this selection. `HOME` remains unchanged.
+- **Credentials**: WaaP reads/writes its session directly; fleet does not copy it back after a command. Session deletion stays deleted and pending signup state survives interruption. Directories use mode `0700`, session files `0600`.
+- **Trust boundary**: these are profiles for one trusted local operator, not OS sandboxes. `exec` and local deployment can access the operator's other files and inherited environment. Run only trusted code here; enforce wallet permissions at WaaP. Detached local agents do not hold the fleet command lock for their lifetime. Do not run simultaneous authentication/session-mutating commands against a profile used by a running agent.
 - **Telemetry**: read-only Postgres against the existing Neon schema (`agent_events`, `agent_balance_snapshots`). No schema changes.
 - **Wallet linking**: consumes Lucian's upcoming `waap_linkAddress` SDK methods. Linkage verbs are gated behind `--feature linking` until they ship — see [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
+
+### Upgrading the session adapter
+
+Compatibility is tested against published WaaP CLI **2.2.1**. Upgrade the CLI before using this adapter. Existing `sessions/<agent-id>/session.json` files remain in place; fleet does not rewrite their format. If WaaP rejects a legacy session, authenticate again through `aex-fleet waap login` for that agent.
+
+Old `sandboxes/<agent-id>/.waap-agent` or `.waap-cli` copies are never imported or restored. Stop older fleet processes before upgrading. Reauthenticate the affected agents instead of copying stale tokens. After confirming access, review and remove obsolete local copies; deleting a file alone does not revoke a remote credential. Use WaaP logout and check its remote-revocation result. Separate staging and production using different `AEX_FLEET_HOME` roots together with the corresponding `WAAP_CLI_ENV`.
+
+`npm ci && npm run type-check && npm test && npm run build` runs the adapter tests and the actual published CLI with synthetic sessions and network access blocked. Coverage includes three concurrent profiles, metadata redaction, session deletion, registration-file retention and unchanged HOME. It does not prove live login, remote logout/revocation, transaction policy enforcement or funded recipe execution.
 
 ## Status of v1
 
 Day 1–7 of a one-week prototype:
 
 - [x] Day 1 — scaffold, `FleetManager`, locked `fleet.json`, `add`/`ls`/`use`/`rm`
-- [x] Day 2 — `waap-runner` HOME-sandbox, file-backed session store, `exec` + `waap` passthrough
+- [x] Day 2 — `waap-runner` per-agent session directory, file-backed session store, `exec` + `waap` passthrough
 - [x] Day 3 — `policy get/set` with `--all`/`--tag`/`--agent` + result table + EventEmitter
 - [x] Day 4 — Neon read-only client + `status` (3 aggregate queries) + graceful degradation
 - [x] Day 5 — `doctor`, `SKILL.md`, Claude Code template, demo script
 - [x] Day 6 — `plan` / `apply` two-phase + `--dry-run` on side-effecting verbs + `--help` polish
-- [x] Day 7 — Claude Code demo transcript, `KNOWN_ISSUES.md`, upstream `WAAP_CONFIG_DIR` ask
+- [x] Day 7 — Claude Code demo transcript, `KNOWN_ISSUES.md`, WaaP session-directory compatibility
 
 What's deferred and why → [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 

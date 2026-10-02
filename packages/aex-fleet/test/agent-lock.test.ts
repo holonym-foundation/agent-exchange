@@ -27,7 +27,7 @@ describe('per-agent lock', () => {
     // Without the lock, the three reads would race and two writes would be lost.
     const script = `
       const fs = require('fs');
-      const p = process.env.HOME + '/.waap-agent/session.json';
+      const p = process.env.WAAP_CLI_SESSION_DIR + '/session.json';
       let cur = [];
       try { cur = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) {}
       cur.push(process.argv[1]);

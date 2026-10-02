@@ -68,7 +68,7 @@ You'll see three agents with `*` next to `eth-yield-1` (the first add becomes ac
 
 ## 4. Sign up each agent's WaaP wallet
 
-`aex-fleet waap <args…>` passes through to `waap-cli` scoped to the active agent's sandbox — its `~/.waap-agent/session.json` lands in the per-agent dir, not your home.
+`aex-fleet waap <args…>` selects the active agent's canonical `sessions/<agent-id>` directory using `WAAP_CLI_SESSION_DIR`; HOME is unchanged. Use the tested WaaP CLI 2.2.1 and follow the [upgrade guidance](../README.md#upgrading-the-session-adapter) for older sessions.
 
 ```bash
 aex-fleet use eth-yield-1
@@ -185,7 +185,7 @@ open ./dashboard.html
 ## What you've now seen
 
 - **Registry CRUD**: `add`, `ls`, `use`, `rm`
-- **Per-agent scoping**: every `aex-fleet waap …` runs against the active agent's HOME sandbox
+- **Per-agent scoping**: every `aex-fleet waap …` selects the active agent's WaaP session directory; this is not an OS sandbox
 - **Agent-id resolution**: `--to <agent-id>` substitutes the registered address transparently
 - **Bulk ops with safety**: `plan` / `apply` two-phase, `--dry-run`, blast-radius warning
 - **Telemetry**: read-only Neon aggregates with graceful degradation
