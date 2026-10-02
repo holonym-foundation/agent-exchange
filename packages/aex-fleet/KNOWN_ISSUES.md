@@ -68,9 +68,9 @@ under [`internal-docs#1058`](https://github.com/holonym-foundation/internal-docs
 
 ## Rough edges in v1
 
-### `HOME`-sandbox trick
+### Session-directory compatibility
 
-Each `aex-fleet waap …` invocation spawns `waap-cli` with `HOME` overridden to a per-agent sandbox dir. Works today, but a `WAAP_CONFIG_DIR` env var upstream would be cleaner. Filed upstream as **[`holonym-foundation/silk#907`](https://github.com/holonym-foundation/silk/issues/907)** — once it lands, `core/waap-runner.ts` swaps from the `HOME` override to `WAAP_CONFIG_DIR` (a few-line change).
+The adapter uses WaaP's `WAAP_CLI_SESSION_DIR` (tested with published 2.2.1). The previous HOME override and legacy session-copy loop are removed. See [upgrade guidance](README.md#upgrading-the-session-adapter); older sessions may require fresh authentication. Profiles still share the operator's OS privileges.
 
 ### Keychain backend is file-only
 
@@ -88,9 +88,9 @@ The three Neon queries shipped today (latest balance per agent, last event times
 
 `aex-fleet policy set --dry-run` skips invoking `waap-cli`. It does not call `waap-cli` with a `--simulate` equivalent — that would require `waap-cli` itself to have a simulation mode for `policy set`, which it doesn't (and likely doesn't need: policy changes are deterministic). For `waap send-tx`, simulation is on `waap-cli`'s side; pass-through whatever it offers.
 
-### Test suite uses `node` as a fake `waap-cli`
+### Live wallet acceptance remains separate
 
-The `test/waap-runner.test.ts` spawns Node with inline scripts to simulate `waap-cli`. Real integration tests against the actual `@human.tech/waap-cli` binary on Sepolia live in `examples/demo.sh` and are not run in CI (no funded test wallet, no faucet automation).
+Process fixtures exercise session lifecycle failures; `test/waap-published.test.ts` additionally runs the pinned published CLI with synthetic sessions and networking blocked. This verifies the local compatibility contract. Live signup, remote logout/revocation, authorization policy and transactions require dedicated acceptance; the example demo is not evidence that these checks passed.
 
 ## Tracking
 

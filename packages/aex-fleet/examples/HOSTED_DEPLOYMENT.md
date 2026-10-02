@@ -170,7 +170,7 @@ for n in 1 2 3; do aex-fleet rm hosted-pass-$n; done
 
 - **Image:** node:20-bookworm-slim + waap-cli + jq + bash + dumb-init. ~250 MB compressed.
 - **Process model:** dashboard is PID 1; perpetual loop spawned as managed child via the Start button. dumb-init reaps zombies if the child crashes.
-- **Volume:** `/var/lib/aex-fleet` named volume — holds `fleet.json`, `sessions/<agent>/session.json`, `sandboxes/<agent>/.waap-agent/`, `perpetual-pass.state.json`, `perpetual-pass.log.jsonl`. Backup with `docker run --rm -v aex-fleet-data:/data -v "$PWD":/out alpine tar czf /out/aex-fleet-backup.tar.gz -C /data .`
+- **Volume:** `/var/lib/aex-fleet` named volume — holds `fleet.json`, `sessions/<agent>/session.json`, `sessions/<agent>/pending-registration.json`, `sandboxes/<agent>/.lock`, `perpetual-pass.state.json`, `perpetual-pass.log.jsonl`. Backup with `docker run --rm -v aex-fleet-data:/data -v "$PWD":/out alpine tar czf /out/aex-fleet-backup.tar.gz -C /data .`
 - **Port:** dashboard binds `0.0.0.0:3001` inside the container; `docker-compose.yml` maps to `127.0.0.1:3001` on the host so the reverse proxy is the only thing exposed publicly.
 - **Auth:** none in the container; reverse proxy handles it. The mutation endpoints (pause/resume/policy/start/stop) are only reachable from things that can hit `127.0.0.1:3001` on the host — i.e., the reverse proxy and root.
 - **No supervisord:** the loop is supervised by the dashboard process. If it dies, the dashboard reports `lastExitCode` + waits for the operator to click Start again. Demo-grade; for productionized agents use the existing `agent-runtime` systemd-on-host pattern instead.

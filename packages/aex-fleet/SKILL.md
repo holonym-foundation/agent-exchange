@@ -1,6 +1,6 @@
 ---
 name: aex-fleet
-description: Manage many WaaP agent wallets at once from one operator. Use when the user wants to onboard multiple agents, apply policies in bulk across a fleet, switch between agent contexts, run waap-cli scoped to a specific agent, or aggregate fleet status (balances, errors, last activity). Wraps @human.tech/waap-cli — each agent gets its own sandboxed HOME so sessions don't collide.
+description: Manage many WaaP agent wallets at once from one operator. Use when the user wants to onboard multiple agents, apply policies in bulk across a fleet, switch between agent contexts, run waap-cli scoped to a specific agent, or aggregate fleet status (balances, errors, last activity). Wraps @human.tech/waap-cli — each agent gets its own WAAP_CLI_SESSION_DIR with HOME unchanged. Local profiles are not OS sandboxes.
 metadata:
   author: holonym-foundation
   version: '0.0.1'
@@ -77,7 +77,7 @@ Bulk ops are sequential (2FA in `waap-cli` forces it). Failures don't halt — n
 | Command | Shape | When |
 |---|---|---|
 | `aex-fleet waap <args…>` | passthrough | run any `waap-cli` invocation scoped to the active agent |
-| `aex-fleet exec <cmd> <args…>` | passthrough | run any command with `HOME` pointed at the active agent's sandbox |
+| `aex-fleet exec <cmd> <args…>` | passthrough | run trusted local code with the active agent's `WAAP_CLI_SESSION_DIR` |
 
 `AEX_FLEET_AGENT=<id>` env overrides the active agent for one invocation.
 
@@ -155,7 +155,10 @@ Data root: `$XDG_CONFIG_HOME/aex-fleet/` (or platform default). Override with `A
 $AEX_FLEET_HOME/
   fleet.json                       # registry (mode 0600)
   sessions/<agent-id>/session.json # waap-cli session material (mode 0600)
-  sandboxes/<agent-id>/.waap-agent/session.json  # materialised per-spawn
+  sessions/<agent-id>/pending-registration.json # resumable signup, when present
+  sandboxes/<agent-id>/.lock                    # fleet command lock only
 ```
 
 No secrets in `fleet.json`. Tracking issue: [holonym-foundation/internal-docs#1166](https://github.com/holonym-foundation/internal-docs/issues/1166).
+
+Use WaaP CLI 2.2.1 for the tested session-directory contract. Never restore an old sandbox session after logout. See [session upgrade and testing guidance](README.md#upgrading-the-session-adapter). Profile selection does not isolate arbitrary code from the operator or prove remote revocation or wallet policy enforcement.

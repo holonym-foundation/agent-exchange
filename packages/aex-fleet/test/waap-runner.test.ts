@@ -1,90 +1,92 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readSession, writeSession } from '../src/core/keychain.js'
-import { runWaap, sandboxDir } from '../src/core/waap-runner.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readSession, sessionDir, sessionPath, writeSession } from '../src/core/keychain.js'
+import { passthroughExec, passthroughWaap, runWaap, sandboxDir } from '../src/core/waap-runner.js'
 
-// We use `process.execPath` (node itself) as the fake waap-cli binary and pass `-e <script>` to
-// have it read/write the sandbox's session.json. That lets us prove HOME-overriding works and
-// the materialise/persist cycle round-trips, without needing a real waap-cli installed.
-
+// Process fixtures exercise failures and file lifecycle without authenticating or signing.
 describe('waap-runner', () => {
-  let xdg: string
-
+  let root: string
   beforeEach(() => {
-    xdg = mkdtempSync(join(tmpdir(), 'aex-fleet-xdg-'))
-    process.env.XDG_CONFIG_HOME = xdg
+    root = mkdtempSync(join(tmpdir(), 'aex-fleet-profiles-'))
+    vi.stubEnv('AEX_FLEET_HOME', root)
+    vi.stubEnv('WAAP_CLI_SESSION_DIR', join(root, 'operator-profile'))
   })
-
   afterEach(() => {
-    delete process.env.XDG_CONFIG_HOME
-    rmSync(xdg, { recursive: true, force: true })
+    vi.unstubAllEnvs()
+    rmSync(root, { recursive: true, force: true })
   })
 
-  it('runs the binary with HOME pointed at the agent sandbox', async () => {
-    const result = await runWaap({
-      agentId: 'sandbox-test',
-      bin: process.execPath,
-      args: ['-e', 'console.log(process.env.HOME)']
-    })
+  it('pins the agent profile over inherited settings and preserves HOME', async () => {
+    const result = await runWaap({ agentId: 'alpha', bin: process.execPath,
+      args: ['-e', 'console.log(JSON.stringify({profile:process.env.WAAP_CLI_SESSION_DIR,home:process.env.HOME}))'] })
     expect(result.exitCode).toBe(0)
-    expect(result.stdout.trim()).toBe(sandboxDir('sandbox-test'))
+    expect(JSON.parse(result.stdout)).toEqual({ profile: sessionDir('alpha'), home: process.env.HOME })
+    expect(statSync(sessionDir('alpha')).mode & 0o777).toBe(0o700)
   })
 
-  it('materialises the stored session into the sandbox before invocation', async () => {
-    writeSession('mat-test', { jwt: 'abc', userKey: 'k' })
-    const result = await runWaap({
-      agentId: 'mat-test',
-      bin: process.execPath,
-      args: [
-        '-e',
-        "const fs=require('fs'); process.stdout.write(fs.readFileSync(process.env.HOME+'/.waap-agent/session.json','utf8'))"
-      ]
-    })
+  it('uses the canonical session directly and retains pending registration across commands', async () => {
+    writeSession('alpha', { jwt: 'fixture-old' })
+    const result = await runWaap({ agentId: 'alpha', bin: process.execPath, args: ['-e', `
+      const fs = require('fs'), dir = process.env.WAAP_CLI_SESSION_DIR;
+      if (JSON.parse(fs.readFileSync(dir+'/session.json')).jwt !== 'fixture-old') process.exit(9);
+      fs.writeFileSync(dir+'/session.json', JSON.stringify({jwt:'fixture-new'}), {mode:0o600});
+      fs.writeFileSync(dir+'/pending-registration.json', JSON.stringify({flowId:'fixture-flow'}), {mode:0o600});
+    `] })
     expect(result.exitCode).toBe(0)
-    expect(JSON.parse(result.stdout)).toEqual({ jwt: 'abc', userKey: 'k' })
+    expect(readSession('alpha')).toEqual({ jwt: 'fixture-new' })
+    const next = await runWaap({ agentId: 'alpha', bin: process.execPath,
+      args: ['-e', "console.log(require('fs').readFileSync(process.env.WAAP_CLI_SESSION_DIR+'/pending-registration.json','utf8'))"] })
+    expect(JSON.parse(next.stdout)).toEqual({ flowId: 'fixture-flow' })
   })
 
-  it('persists session changes back to the store after invocation', async () => {
-    writeSession('persist-test', { jwt: 'old' })
-    const result = await runWaap({
-      agentId: 'persist-test',
-      bin: process.execPath,
-      args: [
-        '-e',
-        "const fs=require('fs'); fs.writeFileSync(process.env.HOME+'/.waap-agent/session.json', JSON.stringify({jwt:'new'}))"
-      ]
-    })
-    expect(result.exitCode).toBe(0)
-    expect(readSession('persist-test')).toEqual({ jwt: 'new' })
+  it('never resurrects a deleted session, including when stale legacy copies exist', async () => {
+    writeSession('alpha', { jwt: 'fixture-current' })
+    const legacy = join(sandboxDir('alpha'), '.waap-agent')
+    mkdirSync(legacy, { recursive: true })
+    writeFileSync(join(legacy, 'session.json'), '{"jwt":"fixture-stale"}')
+    const removed = await runWaap({ agentId: 'alpha', bin: process.execPath,
+      args: ['-e', "require('fs').unlinkSync(process.env.WAAP_CLI_SESSION_DIR+'/session.json'); process.exit(7)"] })
+    expect(removed.exitCode).toBe(7)
+    const next = await runWaap({ agentId: 'alpha', bin: process.execPath,
+      args: ['-e', "console.log(require('fs').existsSync(process.env.WAAP_CLI_SESSION_DIR+'/session.json'))"] })
+    expect(next.stdout).toBe('false')
+    expect(readSession('alpha')).toBeUndefined()
+    expect(existsSync(join(legacy, 'session.json'))).toBe(true)
   })
 
-  it('returns the non-zero exit code when the binary fails', async () => {
-    const result = await runWaap({
-      agentId: 'fail-test',
-      bin: process.execPath,
-      args: ['-e', 'process.exit(7)']
-    })
-    expect(result.exitCode).toBe(7)
+  it.each(['waap', 'exec'])('pins the same profile for %s passthrough', async (kind) => {
+    const receipt = join(root, `${kind}.json`)
+    const args = ['-e', `require('fs').writeFileSync(process.argv[1], JSON.stringify({profile:process.env.WAAP_CLI_SESSION_DIR,home:process.env.HOME}))`, receipt]
+    const code = kind === 'waap'
+      ? await passthroughWaap({ agentId: 'alpha', bin: process.execPath, args })
+      : await passthroughExec({ agentId: 'alpha', cmd: process.execPath, args })
+    expect(code).toBe(0)
+    expect(JSON.parse(readFileSync(receipt, 'utf8'))).toEqual({ profile: sessionDir('alpha'), home: process.env.HOME })
   })
 
-  it('captures stderr from the binary', async () => {
-    const result = await runWaap({
-      agentId: 'stderr-test',
-      bin: process.execPath,
-      args: ['-e', "console.error('boom'); process.exit(2)"]
-    })
+  it('preserves a damaged session rather than treating it as a successful logout', async () => {
+    writeSession('alpha', { jwt: 'fixture' })
+    const result = await runWaap({ agentId: 'alpha', bin: process.execPath,
+      args: ['-e', "require('fs').writeFileSync(process.env.WAAP_CLI_SESSION_DIR+'/session.json', '{broken'); process.exit(2)"] })
+    expect(result.exitCode).toBe(2)
+    expect(readFileSync(sessionPath('alpha'), 'utf8')).toBe('{broken')
+    expect(() => readSession('alpha')).toThrow()
+  })
+
+  it.each(['../other', '..', '/tmp/other', 'alpha/beta', 'alpha\\beta', ''])('rejects invalid profile ID %j before spawning', async (agentId) => {
+    await expect(runWaap({ agentId, bin: process.execPath, args: ['-e', 'process.exit(0)'] })).rejects.toThrow('Agent ID')
+  })
+
+  it('captures exit code and stderr', async () => {
+    const result = await runWaap({ agentId: 'alpha', bin: process.execPath, args: ['-e', "console.error('boom'); process.exit(2)"] })
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain('boom')
   })
 
-  it('returns a non-zero exit code with a message when the binary is not found', async () => {
-    const result = await runWaap({
-      agentId: 'missing-test',
-      bin: '/nonexistent/waap-cli-xyz',
-      args: ['--version']
-    })
+  it('returns a failure when the binary cannot spawn', async () => {
+    const result = await runWaap({ agentId: 'alpha', bin: '/nonexistent/waap-cli', args: ['--version'] })
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr.length).toBeGreaterThan(0)
   })
