@@ -30,7 +30,7 @@ const SELECT_FLAGS = (cmd: Command): Command =>
     .option('--json', 'Emit results as JSON')
 
 /**
- * `aex-fleet autopay` — WS-D / #1256 buyer autopay (Model 2).
+ * `aex-fleet autopay` — buyer autopay.
  *
  * Arms the agent's own WaaP wallet to auto-buy + auto-renew its compute lease without a human
  * approving each tx, bounded by a daily spend cap the user consents to here. `enable` pushes the
@@ -39,7 +39,7 @@ const SELECT_FLAGS = (cmd: Command): Command =>
  */
 export function autopayCommand(): Command {
   const autopay = new Command('autopay').description(
-    'Arm/disarm policy-bounded buyer autopay (auto-buy + auto-renew compute lease, #1256)'
+    'Arm/disarm policy-bounded buyer autopay (auto-buy + auto-renew compute lease)'
   )
 
   SELECT_FLAGS(

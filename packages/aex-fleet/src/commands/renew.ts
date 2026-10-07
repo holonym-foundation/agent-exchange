@@ -3,7 +3,7 @@ import pc from 'picocolors'
 import { renewAll, type RenewAllResult } from '../core/renewal.js'
 
 /**
- * `aex-fleet renew` — WS-D / #1256 autopay renewal loop.
+ * `aex-fleet renew` — autopay renewal loop.
  *
  * One sweep (default) or a long-running watcher (`--watch`) that, for each autopay-enabled agent
  * whose lease is near expiry, re-buys the next term within the consented cap (signed by the agent's

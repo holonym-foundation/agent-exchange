@@ -5,7 +5,6 @@ metadata:
   author: holonym-foundation
   version: '0.0.1'
   scope: operator CLI for AEX fleets
-  related-issues: 'holonym-foundation/internal-docs#1166'
 ---
 
 # aex-fleet — operator CLI for many WaaP agents at once
@@ -143,7 +142,7 @@ aex-fleet status --json \
 - **"No active agent"** — the user has no `--agent`, no `AEX_FLEET_AGENT` env, and no `activeAgent` in `fleet.json`. Suggest `aex-fleet use <id>` or `--all` / `--tag`.
 - **"Telemetry unavailable"** — `AEX_FLEET_NEON_DSN_RO` is not set. `status` still runs; balances + error counts show `—`. Surface the suggestion to set the DSN.
 - **`waap-cli` not installed** — `aex-fleet doctor` will catch this. Direct the user to install `@human.tech/waap-cli` globally.
-- **Linkage commands marked `--feature linking`** — Lucian's wallet-linking SDK methods aren't shipped yet in v1. The verbs exist (`aex-fleet link` / `unlink`) but require the feature flag; expect a no-op-with-warning until they ship.
+- **Linkage commands marked `--feature linking`** — The wallet-linking SDK methods aren't shipped yet in v1. The verbs exist (`aex-fleet link` / `unlink`) but require the feature flag; expect a no-op-with-warning until they ship.
 
 ---
 
@@ -159,6 +158,6 @@ $AEX_FLEET_HOME/
   sandboxes/<agent-id>/.lock                    # fleet command lock only
 ```
 
-No secrets in `fleet.json`. Tracking issue: [holonym-foundation/internal-docs#1166](https://github.com/holonym-foundation/internal-docs/issues/1166).
+No secrets in `fleet.json`. Report issues in [holonym-foundation/agent-exchange](https://github.com/holonym-foundation/agent-exchange/issues).
 
 Use WaaP CLI 2.2.1 for the tested session-directory contract. Never restore an old sandbox session after logout. See [session upgrade and testing guidance](README.md#upgrading-the-session-adapter). Profile selection does not isolate arbitrary code from the operator or prove remote revocation or wallet policy enforcement.

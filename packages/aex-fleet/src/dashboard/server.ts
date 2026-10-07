@@ -53,7 +53,7 @@ export interface DashboardState {
   allTags: string[]
   treasury: { exists: boolean; agentId: string; address: string | null; balance: number | null; hasSession: boolean }
   // Wallet-linking demonstrator. PROTOTYPE: linkedTo is written to fleet.json locally; swaps to
-  // silk#904 (waap_linkAddress via AppKit signer) + silk#903 (cluster read) when those merge.
+  // the WaaP SDK's waap_linkAddress (via AppKit signer) + cluster read endpoint when those ship.
   linkingMode: 'prototype' | 'live'
   operator: { anchorAgentId: string | null; anchorAddress: string | null; clusterSize: number; email: string | null }
   agents: Array<{
@@ -431,9 +431,9 @@ export async function startServer(
           return
         }
         // ── Wallet-linking demonstrator (PROTOTYPE) ─────────────────────────────────────────
-        // These mirror the shape of silk#904 (linkAddress/unlinkAddress) so the swap is a
+        // These mirror the shape of the planned linkAddress/unlinkAddress SDK methods so the swap is a
         // drop-in: replace the fleet.json write below with a waap_linkAddress SDK call (which
-        // does the SIWE/AppKit signer flow) once #904 publishes. The anchor defaults to the
+        // does the SIWE/AppKit signer flow) once it ships. The anchor defaults to the
         // operator/treasury address.
         //
         // POST /api/fleet/link { anchor?, tag?, all? } — link selected agents to the anchor.

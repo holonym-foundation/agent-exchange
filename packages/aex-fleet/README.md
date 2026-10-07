@@ -2,7 +2,7 @@
 
 Operator CLI for managing many WaaP agent wallets at once.
 
-> v1 prototype — see tracking issue [`holonym-foundation/internal-docs#1166`](https://github.com/holonym-foundation/internal-docs/issues/1166).
+> v1 prototype. Report issues in [holonym-foundation/agent-exchange](https://github.com/holonym-foundation/agent-exchange/issues).
 
 ## What it does
 
@@ -17,7 +17,7 @@ Wraps [`@human.tech/waap-cli`](https://www.npmjs.com/package/@human.tech/waap-cl
 | `aex-fleet waap …` | Pass through to `waap-cli` scoped to the active agent |
 | `aex-fleet exec …` | Run trusted local code with the active agent's WaaP profile |
 | `aex-fleet policy get/set` | Inspect / set policy in bulk via `--all`, `--tag`, `--agent` |
-| `aex-fleet autopay enable/disable/pause/resume/status` | Arm policy-bounded buyer autopay (auto-buy + auto-renew the compute lease, #1256) |
+| `aex-fleet autopay enable/disable/pause/resume/status` | Arm policy-bounded buyer autopay (auto-buy + auto-renew the compute lease) |
 | `aex-fleet renew [--watch]` | Renewal loop — re-buy near-expiry leases within the consented cap (one-shot or daemon) |
 | `aex-fleet status` | Aggregate balances, last activity, errors (24h) from Neon |
 | `aex-fleet plan` / `aex-fleet apply` | Two-phase bulk ops — preview, then approve |
@@ -51,7 +51,7 @@ aex-fleet status
 
 Full end-to-end demo on Sepolia: [`examples/demo.sh`](./examples/demo.sh).
 
-## Buyer autopay (Model 2, #1256)
+## Buyer autopay
 
 `autopay` arms an agent's **own WaaP wallet** to auto-buy and auto-renew its compute lease without a
 human approving each transaction — bounded by a daily spend cap the user consents to at enable time.
@@ -122,8 +122,8 @@ Override the whole data root with `AEX_FLEET_HOME=/path/to/dir`. Useful for isol
 - **Per-agent scoping**: capture, passthrough, `exec` and local deployment set `WAAP_CLI_SESSION_DIR` to the agent's canonical `sessions/<agent-id>` directory. An inherited operator setting cannot override this selection. `HOME` remains unchanged.
 - **Credentials**: WaaP reads/writes its session directly; fleet does not copy it back after a command. Session deletion stays deleted and pending signup state survives interruption. Directories use mode `0700`, session files `0600`.
 - **Trust boundary**: these are profiles for one trusted local operator, not OS sandboxes. `exec` and local deployment can access the operator's other files and inherited environment. Run only trusted code here; enforce wallet permissions at WaaP. Detached local agents do not hold the fleet command lock for their lifetime. Do not run simultaneous authentication/session-mutating commands against a profile used by a running agent.
-- **Telemetry**: read-only Postgres against the existing Neon schema (`agent_events`, `agent_balance_snapshots`). No schema changes.
-- **Wallet linking**: consumes Lucian's upcoming `waap_linkAddress` SDK methods. Linkage verbs are gated behind `--feature linking` until they ship — see [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
+- **Telemetry**: read-only Postgres against the AEX telemetry schema (`agent_events`, `agent_balance_snapshots`). No schema changes.
+- **Wallet linking**: consumes the upcoming `waap_linkAddress` SDK methods. Linkage verbs are gated behind `--feature linking` until they ship — see [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 
 ### Upgrading the session adapter
 

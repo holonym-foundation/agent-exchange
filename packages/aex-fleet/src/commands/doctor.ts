@@ -125,7 +125,7 @@ async function checkNeon(): Promise<CheckResult> {
 }
 
 function checkLinkage(): CheckResult {
-  // Lucian's wallet-linking SDK methods (waap_linkAddress / waap_getLinkedAddresses) are not yet
+  // WaaP's wallet-linking SDK methods (waap_linkAddress / waap_getLinkedAddresses) are not yet
   // wired in v1 — gated behind --feature linking. Surface as 'pending' so operators know it's
   // explicitly deferred, not silently missing.
   return {

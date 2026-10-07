@@ -161,11 +161,13 @@ aex-fleet status
 aex-fleet status --json | jq '.summary'
 ```
 
-If you've set `AEX_FLEET_NEON_DSN_RO=…` (the read-only DSN for the existing aex Neon project), this pulls latest balance, last event timestamp, and error counts for the last 24h per agent. Without it, status degrades gracefully and prints `—`.
+If you've set `AEX_FLEET_NEON_DSN_RO=…` (a read-only DSN for your telemetry database), this pulls latest balance, last event timestamp, and error counts for the last 24h per agent. Without it, status degrades gracefully and prints `—`.
 
 ---
 
 ## 10. Spin up the dashboard
+
+The dashboard's Create and Run steps sign up WaaP accounts with the password in `PASSWORD` (12 to 64 characters). Set it before starting the dashboard.
 
 ```bash
 aex-fleet dashboard
