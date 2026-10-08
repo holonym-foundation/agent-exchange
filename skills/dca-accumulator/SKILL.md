@@ -21,7 +21,7 @@ per-cycle amount.
    --slippage-bps {AGENT_MAX_SLIPPAGE_BPS} --recipient <your WaaP address>`. It picks the best
    Uniswap v3 fee tier (or a 2-hop via WETH), returns the **quoted price/token** (for cost basis) and
    `approve` + `swap` calldata, with `amountOutMinimum` from slippage.
-3. **Execute** the two txs via `waap-cli send-tx` (2PC — no private key in the env). **Abort** if the
+3. **Execute** the two txs via `waap-cli send-tx` (WaaP signs; no private key in the env). **Abort** if the
    quote implies worse than `{AGENT_MAX_SLIPPAGE_BPS}`. **Never spend more than `{DCA_AMOUNT_USD}`** in
    a cycle.
 4. **Dry-run:** if `AGENT_DRY_RUN` is `"1"`, DON'T send — log the intended buy + quoted price and stop.
