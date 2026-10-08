@@ -12,7 +12,7 @@ export const PROVIDER_NAMES: ProviderName[] = ['arkhai', 'marlin-tee', 'local', 
 
 /**
  * Resolve a compute provider by name. Arkhai (general compute) and Marlin (TEE) are parallel peers.
- * `hetzner-systemd` is the existing manual deploy.sh path and isn't wrapped yet — it throws with a
+ * `hetzner-systemd` (SSH + systemd on a self-managed host) isn't wrapped yet — it throws with a
  * pointer rather than pretending to exist.
  */
 export function getProvider(name: string, options: Record<string, unknown> = {}): ComputeProvider {
@@ -26,7 +26,7 @@ export function getProvider(name: string, options: Record<string, unknown> = {})
       return new LocalProvider()
     case 'hetzner-systemd':
       throw new Error(
-        'hetzner-systemd provider not wrapped yet — use the per-agent deploy.sh under deployments/ for now.'
+        'hetzner-systemd provider not wrapped yet — use your own SSH + systemd deploy.sh for now.'
       )
     default:
       throw new Error(`Unknown deploy target: ${name}. Known: ${PROVIDER_NAMES.join(', ')}`)

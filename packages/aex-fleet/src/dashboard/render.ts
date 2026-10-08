@@ -9,7 +9,7 @@ const MODALS = `
   <div class="modal-backdrop" id="create-modal"><div class="modal">
     <h3>Create demo agents</h3>
     <div class="field"><label>EMAIL_BASE (plus-aliasing routes all to one inbox)</label>
-      <input id="create-email" type="email" placeholder="webmaster@holonym.id" /></div>
+      <input id="create-email" type="email" placeholder="you@example.com" /></div>
     <div class="field"><label>How many</label>
       <input id="create-count" type="number" min="1" max="20" value="3" /></div>
     <div class="err" id="create-error"></div>
@@ -27,7 +27,7 @@ const MODALS = `
   <div class="modal-backdrop" id="run-modal"><div class="modal">
     <h3>Start perpetual loop</h3>
     <div class="field"><label>EMAIL_BASE</label>
-      <input id="run-email" type="email" placeholder="webmaster@holonym.id" /></div>
+      <input id="run-email" type="email" placeholder="you@example.com" /></div>
     <div class="field"><label>Delay between hops (seconds, default 300)</label>
       <input id="run-delay" type="number" min="3" placeholder="300" /></div>
     <div class="field"><label>Amount per hop (ETH, default 0.0001)</label>

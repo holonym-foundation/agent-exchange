@@ -6,9 +6,9 @@ Honest list of what's intentionally deferred or still rough.
 
 ### Wallet linking verbs (`link` / `unlink`)
 
-**Status:** stub. `aex-fleet link` and `aex-fleet unlink` are not registered yet because Lucian's `waap_linkAddress` / `waap_unlinkAddress` SDK methods in `@human.tech/waap-sdk` aren't shipped yet. The linkage column in `ls` will stay blank until they ship. The plan reserves `--feature linking` as the gating flag.
+**Status:** stub. `aex-fleet link` and `aex-fleet unlink` are not registered yet because the `waap_linkAddress` / `waap_unlinkAddress` SDK methods in `@human.tech/waap-sdk` aren't shipped yet. The linkage column in `ls` will stay blank until they ship. The plan reserves `--feature linking` as the gating flag.
 
-**Next step:** confirm Lucian's ship date, then add the verbs + wire `linkage.ts` against the SDK. Surface aggregate Passport humanity score in `status` when the operator has an anchor address.
+**Next step:** once the SDK methods ship, add the verbs + wire `linkage.ts` against the SDK. Surface aggregate Passport humanity score in `status` when the operator has an anchor address.
 
 ### Embedded WaaP sign-in is REAL; browser-funding needs operator ETH
 
@@ -31,22 +31,21 @@ transfer). The operator's Human Wallet must hold Sepolia ETH. Caveats:
 
 **Status:** demonstrator. The dashboard's "Link" pipeline step + the `/api/fleet/link`,
 `/api/fleet/unlink`, `/api/agents/:id/link|unlink` endpoints currently just write `linkedTo`
-to `fleet.json` locally. They mirror the *shape* of Lucian's wallet-linking work so the swap is
+to `fleet.json` locally. They mirror the *shape* of the planned WaaP wallet-linking API so the swap is
 a drop-in.
 
-**Swap when these merge:**
-- [`silk#904`](https://github.com/holonym-foundation/silk/pull/904) — `linkAddress` / `unlinkAddress` / `getLinkedAddresses` SDK methods (via WalletConnect AppKit signer — the operator signs a SIWE message). Replace the `fleet.json` write in the link endpoints with these calls.
-- [`silk#903`](https://github.com/holonym-foundation/silk/pull/903) — `GET /api/public/linked-wallets/by-address/:address` public read endpoint. Use it in `status` / the cluster panel to show the real cluster + Passport humanity score, replacing the locally-derived `operator.clusterSize`.
+**Swap when these ship:**
+- `linkAddress` / `unlinkAddress` / `getLinkedAddresses` SDK methods (via WalletConnect AppKit signer — the operator signs a SIWE message). Replace the `fleet.json` write in the link endpoints with these calls.
+- A public `GET /api/public/linked-wallets/by-address/:address` public read endpoint. Use it in `status` / the cluster panel to show the real cluster + Passport humanity score, replacing the locally-derived `operator.clusterSize`.
 
 The demonstrator establishes the narrative (operator wallet = treasury = identity anchor; agents
-link to it) and the UI surface; the model is correct, only the backend call is stubbed. Tracked
-under [`internal-docs#1058`](https://github.com/holonym-foundation/internal-docs/issues/1058).
+link to it) and the UI surface; the model is correct, only the backend call is stubbed.
 
 ### ERC-8004 actual on-chain minting (v1.0.2 ships intent-only)
 
 **Status:** stub. `aex-fleet erc8004 register …` and `add --register-erc8004` record intent in `fleet.json` but do NOT mint on-chain because EIP-8004 is Draft and no canonical singleton deployment exists. All registrations show `pending — contracts not yet deployed`.
 
-**Next step:** populate `CONTRACTS_BY_CHAIN` in `src/core/erc8004.ts` with Identity Registry + Reputation Registry addresses (Sepolia first for testnet, then Ethereum mainnet). Wire the actual `register(agentURI, metadata) → uint256` call using `viem`. Host registration files at `https://aex.human.tech/agents/<tokenId>.json` (or `data:` inline as a sovereign fallback). See [`holonym-foundation/internal-docs#1166`](https://github.com/holonym-foundation/internal-docs/issues/1166) for the integration sketch.
+**Next step:** populate `CONTRACTS_BY_CHAIN` in `src/core/erc8004.ts` with Identity Registry + Reputation Registry addresses (Sepolia first for testnet, then Ethereum mainnet). Wire the actual `register(agentURI, metadata) → uint256` call using `viem`. Host registration files at `https://aex.human.tech/agents/<tokenId>.json` (or `data:` inline as a sovereign fallback).
 
 ### Forked-opencode "wallet shell"
 
@@ -78,7 +77,7 @@ The session store at `core/keychain.ts` is file-backed (mode `0600`) rather than
 
 ### `status` queries are conservative
 
-The three Neon queries shipped today (latest balance per agent, last event timestamp, error count last 24h) work against the schema documented in `prd/aex/agent-runtime.md`. Total-spend-across-fleet would require knowing the exact `agent_events.data` jsonb keys per agent template, which varies — left out of v1 to avoid speculative columns. Add per-template aggregators when tx event shapes settle.
+The three Neon queries shipped today (latest balance per agent, last event timestamp, error count last 24h) work against the AEX telemetry schema. Total-spend-across-fleet would require knowing the exact `agent_events.data` jsonb keys per agent template, which varies — left out of v1 to avoid speculative columns. Add per-template aggregators when tx event shapes settle.
 
 ### Bulk ops are sequential
 
@@ -94,4 +93,4 @@ Process fixtures exercise session lifecycle failures; `test/waap-published.test.
 
 ## Tracking
 
-Parent issue: [holonym-foundation/internal-docs#1166](https://github.com/holonym-foundation/internal-docs/issues/1166).
+Report issues in [holonym-foundation/agent-exchange](https://github.com/holonym-foundation/agent-exchange/issues).

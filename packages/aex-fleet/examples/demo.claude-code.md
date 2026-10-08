@@ -4,9 +4,10 @@ This is the AI-shell variant of `examples/demo.sh` — the same flow, but invoke
 
 ## One-time setup
 
-1. `npm install -g @human.tech/aex-fleet @human.tech/waap-cli`
-2. Copy `node_modules/@human.tech/aex-fleet/templates/claude-code/CLAUDE.md` to your repo root (or to `.claude/CLAUDE.md` if you prefer the agent-only scope).
-3. Open the repo in Claude Code. The CLAUDE.md primer plus the skill (auto-discovered by Claude Code's skill system from `SKILL.md` in the installed package) prime the model.
+1. Install `@human.tech/waap-cli@2.2.1` globally, then build and `npm link` `aex-fleet` from `packages/aex-fleet` in this repository (it is not published to npm yet).
+2. Copy `packages/aex-fleet/templates/claude-code/CLAUDE.md` to your repo root (or to `.claude/CLAUDE.md` if you prefer the agent-only scope).
+3. Copy `packages/aex-fleet/SKILL.md` to `.claude/skills/aex-fleet/SKILL.md` in your repo so Claude Code loads it as a skill.
+4. Open the repo in Claude Code. The CLAUDE.md primer plus the skill prime the model.
 
 ## The session
 

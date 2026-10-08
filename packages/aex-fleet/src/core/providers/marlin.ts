@@ -14,9 +14,7 @@ import type {
  * docker image and it provisions the enclave. The high-security/compliance tier, kept **parallel**
  * to Arkhai (general compute) — the user picks the target; we don't position them against each other.
  *
- * Partnership is in flight (intro pending; pricing unknown — see
- * internal-docs products/waap/prd/agent-deployment-infrastructure.md), so the concrete CLI/API is
- * not finalized. This wraps a `marlin` CLI (bin configurable) on a docker-image deploy model with
+ * The concrete Marlin CLI/API is not finalized. This wraps a `marlin` CLI (bin configurable) on a docker-image deploy model with
  * the same shape as ArkhaiProvider; `--dry-run` rehearses the plan until the real surface lands.
  */
 
