@@ -32,8 +32,10 @@ The `SKILL.md` at the package root + the `templates/claude-code/CLAUDE.md` proje
 ## Quick start
 
 ```bash
-# Install
-npm install -g @human.tech/aex-fleet @human.tech/waap-cli@2.2.1
+# Install (aex-fleet is not published to npm yet; build it from this repository)
+npm install -g @human.tech/waap-cli@2.2.1
+git clone https://github.com/holonym-foundation/agent-exchange.git
+cd agent-exchange/packages/aex-fleet && npm ci && npm run build && npm link
 
 # Preflight
 aex-fleet doctor

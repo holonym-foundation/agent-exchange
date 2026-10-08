@@ -18,7 +18,10 @@ You should leave this with a working local fleet of test agents on Ethereum Sepo
 ## 1. Install
 
 ```bash
-npm install -g @human.tech/waap-cli @human.tech/aex-fleet
+# aex-fleet is not published to npm yet; build it from this repository
+npm install -g @human.tech/waap-cli@2.2.1
+git clone https://github.com/holonym-foundation/agent-exchange.git
+cd agent-exchange/packages/aex-fleet && npm ci && npm run build && npm link
 aex-fleet --version
 waap-cli --version
 ```
