@@ -84,7 +84,7 @@ things in their docs" beyond just CEX.
 - **Symmetric:** report what you *can't* see (keyless window only, list is partial) as plainly as what
   you can.
 
-## Shield remediation (v2 — agent plans now, executes at the mainnet rollout)
+## Shield remediation (plans only; execution is not wired in yet)
 When a link drops the score, the guard can plan a **shield** to break it (Model A: deposit from the
 user's verified wallet → Aztec private layer + **decorrelate** → withdraw to another of the user's
 verified identities).
@@ -92,11 +92,10 @@ verified identities).
    produces a **decorrelated tranche plan** (varied non-round amounts, jittered timing, respecting the
    Passport ~$1k/tx cap) + **readiness checks** (source≠dest, both verified, caps). Never deposit ==
    withdraw the same amount/time.
-2. `shield_execute.py --plan <plan.json>` is the **execution boundary** — currently a mainnet-gated
-   stub that REFUSES to move funds (Shield SDK + PXE + delegated personhood land at the Aztec-v5
-   rollout). Until then the guard plans + hands off; it executes nothing.
-Eligibility (Passport ≥20 / PoCH) is a **precondition** resolved at the identity layer — see the
-wallet-linking + delegation handoffs in `docs/specs/`. Help the user **stand up a verified
+2. `shield_execute.py --plan <plan.json>` is the **execution boundary**. It is currently a stub that
+   REFUSES to move funds: Shield execution is not wired into this skill yet. The guard plans and
+   hands off; it executes nothing.
+Eligibility (Passport ≥20 / PoCH) is a **precondition** resolved at the identity layer. Help the user **stand up a verified
 destination** if they lack one.
 
 ## Meta-privacy: how this bot protects YOUR privacy (the cypherpunk smell test)
@@ -109,7 +108,7 @@ whole cluster. Be honest about this and minimize it:
 - **Residual risk #2 — data-provider correlation (the subtle one):** querying all your wallets from
   one container/IP **links them at the RPC / ENS / Etherscan provider level**, even if the bot is
   honest. Mitigate: use **your own node**, rotate/per-wallet-isolate providers, or route over Tor.
-  (Roadmap: per-wallet query isolation built in.) Disclose this to the owner — don't hide it.
+  Disclose this to the owner — don't hide it.
 - **Verdict:** the architecture is cypherpunk-aligned (local, keyless, auditable, no backend), but the
   honeypot + provider-correlation residuals are real. The honest posture: self-host, use your own
   node, isolate queries, and never run this on infra you don't trust. Say so to the user.
@@ -117,5 +116,5 @@ whole cluster. Be honest about this and minimize it:
 ## Self-sustaining by design
 Keyless data (ENS reverse API, public RPC; optional Etherscan full history), your own MEMORY (your
 wallet set + last scan), your own Telegram to report. No keys required, no AEX backend. Read-only by
-default — it never transacts until the mainnet Shield rollout, and even then only human-gated, capped,
+default — it never transacts until Shield execution is wired in, and even then only human-gated, capped,
 and between your verified identities.

@@ -53,8 +53,3 @@ state per wallet/chain in MEMORY so you never re-alert the same thing.
 ## Self-sustaining by design
 Keyless data (Merkl v4, public RPC), your own MEMORY (watch list + last-seen claimables + gas state),
 your own Telegram to alert. No keys, no AEX backend. Read-only — it never sends a transaction.
-
-## Roadmap: gas-timing as a service (x402)
-Other agents will be able to **ask this agent "is now a cheap moment on chain X?"** and **pay (x402)
-to have a transaction scheduled for the next cheap-gas window** — a gas-timing oracle + scheduled
-execution that any agent can consume. See the x402 spec; this agent is a natural x402 *provider*.
