@@ -6,7 +6,8 @@
 # leaks any of:
 #   1. Blocked paths      — internal-only dirs/files that must never be published.
 #   2. Secrets            — private keys, DB connection strings, API tokens, mnemonics.
-#   3. Infrastructure     — box IPs, internal hostnames, managed-DB endpoint/branch markers.
+#   3. Infrastructure     — server IP ranges, internal hostnames, managed-DB names (matched by
+#                           SHA-256, so the identifiers are never stored in this public repo).
 #   4. Sensitive wallets  — operational wallet addresses (matched by SHA-256, so the
 #                           addresses themselves are never stored in this public repo).
 #
@@ -38,12 +39,35 @@ secrets=$(git grep -nIE "$secret_re" -- . ':(exclude)scripts/repo-guard.sh' ':(e
 [ -n "$secrets" ] && report "possible secret(s) — do NOT commit credentials:" "$secrets"
 
 # --- 3. Infrastructure -----------------------------------------------------------
-# Box IPs, internal service hostnames, and managed-DB endpoint/branch fingerprints.
-infra_re='(^|[^0-9])(91\.99\.(125|210)|88\.99\.125|167\.233\.(64|97))\.[0-9]{1,3}'          # Hetzner box IPs
-infra_re+='|aex-stack|aex-native-scm|aex-signer|aex-registry-main|aex-run-forced'           # internal hostnames
-infra_re+='|nameless-heart|proud-dust|bold-breeze|mute-truth|ep-[a-z]+-[a-z]+-a2[0-9a-z]+'  # Neon endpoints/branches
-infra=$(git grep -nIE "$infra_re" -- . ':(exclude)scripts/repo-guard.sh' ':(exclude)PUBLIC-REPO-POLICY.md' 2>/dev/null || true)
-[ -n "$infra" ] && report "infrastructure / internal reference — genericize before publishing:" "$infra"
+# Server IP ranges, internal service hostnames, and managed-DB branch names are matched by
+# SHA-256 against scripts/guard/deny-infra-hashes.txt. Candidates are the first three octets
+# of every IPv4 address and every run of two or more hyphen-joined words. A match reports
+# the hash prefix and file:line only, so CI logs never print the identifier.
+neon_re='ep-[a-z]+-[a-z]+-a2[0-9a-z]+'                                                     # Neon endpoint id shape
+neon=$(git grep -nIE "$neon_re" -- . ':(exclude)scripts/repo-guard.sh' 2>/dev/null | cut -d: -f1,2 || true)
+[ -n "$neon" ] && report "managed-DB endpoint id — genericize before publishing:" "$neon"
+
+infra_deny="scripts/guard/deny-infra-hashes.txt"
+if [ -f "$infra_deny" ]; then
+  infra_hashes=$(grep -oiE '^[0-9a-f]{64}' "$infra_deny" | tr 'A-F' 'a-f')
+  infra_hits=$(
+    {
+      git grep -hIoE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' -- . 2>/dev/null | cut -d. -f1-3
+      git grep -hIoiE '[a-z0-9]+(-[a-z0-9]+)+' -- . 2>/dev/null | tr 'A-Z' 'a-z'
+    } | sort -u | perl -MDigest::SHA=sha256_hex -nle '
+      if (/^[0-9]+\.[0-9]+\.[0-9]+$/) { print sha256_hex($_), "\t", $_; next }
+      my @w = split /-/;
+      for my $i (0 .. $#w - 1) { for my $j ($i + 1 .. $#w) {
+        my $t = join("-", @w[$i .. $j]); print sha256_hex($t), "\t", $t } }' \
+      | awk -F'\t' 'NR == FNR { d[$1]; next } ($1 in d)' <(printf '%s\n' "$infra_hashes") - | sort -u
+  )
+  if [ -n "$infra_hits" ]; then
+    while IFS=$'\t' read -r h tok; do
+      where=$(git grep -nIiF -e "$tok" -- . 2>/dev/null | cut -d: -f1,2 | tr '\n' ' ')
+      report "infrastructure identifier present (SHA-256 ${h:0:12}…) — genericize before publishing:" "  $where"
+    done <<< "$infra_hits"
+  fi
+fi
 
 # --- 4. Sensitive wallet addresses (hash-matched) --------------------------------
 denyfile="scripts/guard/deny-address-hashes.txt"
