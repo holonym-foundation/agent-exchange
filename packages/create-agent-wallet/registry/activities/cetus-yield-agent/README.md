@@ -1,6 +1,6 @@
 # Cetus Yield Agent
 
-Autonomous concentrated-liquidity agent on **Cetus Protocol (Sui)**. It implements the canonical 5-phase recipe at [docs.wallet.human.tech/recipes/cetus-yield-agent](https://docs.wallet.human.tech/recipes/cetus-yield-agent): read-only monitoring, transaction simulation, active position management, adaptive ranges, and cross-protocol yield comparison.
+Autonomous concentrated-liquidity agent on **Cetus Protocol (Sui)**. It implements the canonical 5-phase recipe at [docs.waap.human.tech/recipes/cetus-yield-agent](https://docs.waap.human.tech/recipes/cetus-yield-agent): read-only monitoring, transaction simulation, active position management, adaptive ranges, and cross-protocol yield comparison.
 
 Runs on **Sui mainnet** (or testnet via `NETWORK=testnet`).
 
@@ -56,7 +56,7 @@ enabled, inspect the simulated effects, and only then set `DRY_RUN=false`.
 
 ## Full recipe
 
-[docs.wallet.human.tech/recipes/cetus-yield-agent](https://docs.wallet.human.tech/recipes/cetus-yield-agent) — 5 phases from monitor → active → adaptive ranges → cross-pool / cross-protocol comparisons.
+[docs.waap.human.tech/recipes/cetus-yield-agent](https://docs.waap.human.tech/recipes/cetus-yield-agent) — 5 phases from monitor → active → adaptive ranges → cross-pool / cross-protocol comparisons.
 
 ## Verification status
 

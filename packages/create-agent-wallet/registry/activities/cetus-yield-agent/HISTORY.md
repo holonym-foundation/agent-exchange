@@ -8,7 +8,7 @@ and private deployment references were generalized before publication.
 
 | Archived commit | Public-history commit | Author | Contribution |
 |---|---|---|---|
-| `d1e71a2` | `8b50af8` | lebraat (work) | Initial four-runtime activity, based on Muzz's TypeScript scaffold from Silk #859 and the working Cetus implementation |
+| `d1e71a2` | `8b50af8` | lebraat (work) | Initial four-runtime activity, based on Muzzamil's ([@Muzzamil1](https://github.com/Muzzamil1)) TypeScript scaffold in the WaaP SDK repository and the working Cetus implementation |
 | `8164e5e` | `382fe0a` | lebraat (work) | Runtime dependency and WaaP address-resolution fixes |
 | `5d60dd6` | `d430e1d` | lebraat (work) | Set the Cetus SDK sender before building transaction payloads |
 | `28e61b6` | `f4c622d` | lebraat (work) | PID-file supervision and implementation alignment |
