@@ -32,7 +32,6 @@ export interface RunOptions {
   cliVersion: string
 }
 
-const DEFAULT_REGISTRY_URL = 'https://docs.waap.xyz/registry.json'
 const CACHE_DIR = resolve(homedir(), '.create-agent-wallet')
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -274,10 +273,13 @@ function dispatchVars(
 }
 
 function resolveDefaultRegistryUrl(): string {
-  // Offline / local-dev fallback: prefer a bundled registry.json next to the
-  // compiled CLI so `npx` works even without network or a public host.
+  // The release bundles registry.json next to the compiled CLI, so `npx` works
+  // without network access. There is no hosted default registry.
   const here = fileURLToPath(new URL('.', import.meta.url))
   const bundled = resolve(here, 'registry.json')
   if (existsSync(bundled)) return `file://${bundled}`
-  return DEFAULT_REGISTRY_URL
+  throw new CawError(
+    'No bundled registry.json found next to the CLI. Build it with `npm run build`, or pass --registry <url>.',
+    ExitCodes.NETWORK
+  )
 }

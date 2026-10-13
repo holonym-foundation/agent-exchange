@@ -1,6 +1,6 @@
 # {{projectName}} — Cetus Yield Agent (Sui)
 
-Concentrated-liquidity agent on **Cetus Protocol**, scaffolded from the canonical 5-phase recipe at [docs.wallet.human.tech/recipes/cetus-yield-agent](https://docs.wallet.human.tech/recipes/cetus-yield-agent).
+Concentrated-liquidity agent on **Cetus Protocol**, scaffolded from the canonical 5-phase recipe at [docs.waap.human.tech/recipes/cetus-yield-agent](https://docs.waap.human.tech/recipes/cetus-yield-agent).
 
 Default mode is **monitor** (Phase 1 — read-only, no funds at risk), with transaction submission disabled by `DRY_RUN=true`.
 
@@ -45,7 +45,7 @@ The compose file persists the waap-cli session in a named volume (`waap-session`
 
 1. Run a few monitor cycles. Confirm `sim_drift_detected` / `sim_rebalance` events look right.
 2. Set a conservative positive `AGENT_MAX_DEPOSIT_USD` and switch to `AGENT_MODE=active` while keeping `DRY_RUN=true`.
-3. Inspect the simulated transaction effects, gas, and balance changes described in [Phase 2 of the recipe](https://docs.wallet.human.tech/recipes/cetus-yield-agent/phase-2-trade).
+3. Inspect the simulated transaction effects, gas, and balance changes described in [Phase 2 of the recipe](https://docs.waap.human.tech/recipes/cetus-yield-agent/phase-2-trade).
 4. Only after that validation, set `DRY_RUN=false` to allow WaaP-signed submissions.
 
 ## Customise

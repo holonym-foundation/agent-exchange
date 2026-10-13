@@ -175,7 +175,7 @@
     }
   ],
   "waapFeatures": ["send-tx", "policy"],
-  "recipeUrl": "https://docs.wallet.human.tech/recipes/cetus-yield-agent",
+  "recipeUrl": "https://docs.waap.human.tech/recipes/cetus-yield-agent",
   "minCliVersion": "0.1.0",
   "eip8004": {
     "supportedTrust": ["tee-attestation", "reputation"],
