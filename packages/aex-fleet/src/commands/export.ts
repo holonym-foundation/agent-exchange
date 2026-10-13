@@ -18,10 +18,9 @@ Examples:
   $ aex-fleet export --out ~/Dropbox/aex-fleet-backup.json --include-recovery-note
   $ aex-fleet export | jq '.agents[] | {agentId, address}'
 
-Recovery: each agent's wallet is held in WaaP's 2PC architecture. The Sovereign Share is
-derived deterministically from the email + password at signup, and the Security Share lives
-in the WaaP TEE. So even if you lose fleet.json, running \`waap-cli login -e <email> -p
-<password>\` on any machine recovers the wallet — fleet.json just tracks the mapping.`
+Recovery: each agent's wallet is a WaaP account, and its signing keys are never stored on
+this machine. So even if you lose fleet.json, running \`waap-cli login -e <email> -p
+<password>\` on any machine restores access to the wallet — fleet.json just tracks the mapping.`
     )
     .action((opts: { out?: string; includeRecoveryNote?: boolean }) => {
       const fm = new FleetManager()
@@ -35,9 +34,9 @@ in the WaaP TEE. So even if you lose fleet.json, running \`waap-cli login -e <em
         ...(opts.includeRecoveryNote
           ? {
               recovery: {
-                model: 'WaaP 2PC',
+                model: 'WaaP account',
                 howTo:
-                  'Each wallet is recoverable on any machine via `waap-cli login -e <email> -p <password>`. The Sovereign Share is derived from these credentials; the Security Share is held in the WaaP TEE. fleet.json only tracks the local agent-id → address mapping — losing it does NOT lose the wallets.',
+                  'Each wallet is a WaaP account; sign in on any machine via `waap-cli login -e <email> -p <password>`. Signing keys are never stored on this machine. fleet.json only tracks the local agent-id → address mapping — losing it does NOT lose the wallets.',
                 whatToBackup: [
                   'This manifest (agent-id → email mapping)',
                   'The password(s) used during signup',

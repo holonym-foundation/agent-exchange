@@ -50,11 +50,13 @@ The exact public verification scope and commands are recorded in
 
 ## Built on WaaP
 
-Every agent uses [WaaP (Wallet-as-a-Protocol)](https://waap.xyz) for signing:
+Every agent uses [WaaP](https://waap.xyz) for signing:
 
-- **Split-key signing.** The agent never holds a whole private key — your share is required for every transaction, so it cannot sign alone.
-- **Scoped privileges.** Spend caps, address allowlists, and time windows enforced on-chain.
-- **Human-in-the-loop.** High-risk actions ping you for one-tap approval by default.
+- **Enclave signing.** Signing keys are generated inside an attested secure enclave and never reach the agent or its host.
+- **Scoped privileges.** Spend caps, address allowlists, and expiry limit what an agent can sign without a prompt. They are checked before every signature.
+- **Human-in-the-loop.** High-risk actions ask for your approval by default.
+
+See the [WaaP architecture](https://docs.waap.human.tech/overview/architecture-security-model/architecture) and [Privileges](https://docs.waap.human.tech/overview/privileges) docs.
 
 ## Contributing
 
