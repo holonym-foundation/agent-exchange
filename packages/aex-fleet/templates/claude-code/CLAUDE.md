@@ -30,7 +30,7 @@ Customise these for the repo. The values below are placeholders.
 - **Chain default:** _e.g._ `--chain ethereum` (Sepolia for tests)
 - **Default tag prefix:** _e.g._ `--tag <repo-name>` so this project's agents are isolatable
 - **Telemetry:** set `AEX_FLEET_NEON_DSN_RO` in `.env.local` to enable `aex-fleet status`. Without it, status degrades but the command still runs.
-- **Linkage:** wallet linking to the operator's Passport-anchored WaaP address is gated behind `--feature linking` until Lucian's `waap_linkAddress` SDK ships. Don't use the `link` / `unlink` verbs yet.
+- **Linkage:** wallet linking to the operator's Passport-anchored WaaP address is gated behind `--feature linking` until the `waap_linkAddress` SDK method ships. Don't use the `link` / `unlink` verbs yet.
 
 ## Conventions for this repo
 
@@ -47,5 +47,5 @@ Customise these for the repo. The values below are placeholders.
 
 ## Where to file issues
 
-- For bugs in `aex-fleet` itself: [holonym-foundation/internal-docs#1166](https://github.com/holonym-foundation/internal-docs/issues/1166) (parent) or a new sub-issue.
+- For bugs in `aex-fleet` itself: open an issue in [holonym-foundation/agent-exchange](https://github.com/holonym-foundation/agent-exchange/issues).
 - For bugs in `waap-cli` upstream: open against the waap-cli repo and reference this CLAUDE.md.

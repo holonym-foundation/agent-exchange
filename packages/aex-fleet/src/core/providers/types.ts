@@ -2,11 +2,9 @@ import type { AgentEntry } from '../../types.js'
 
 /**
  * Compute-provider abstraction — the seam that lets `aex-fleet deploy` ship an agent onto
- * different backends through one interface. Today deploy is a hand-rolled deploy.sh per agent
- * (rsync + SSH + systemd to one Hetzner box); this generalises it so a backend like Arkhai
+ * different backends through one interface. The baseline is a hand-rolled deploy.sh per agent
+ * (rsync + SSH + systemd to a single host); this generalises it so a backend like Arkhai
  * (on-chain VM leasing) can be a first-class target alongside self-host.
- *
- * Design ref: internal-docs products/waap/prd/aex/deployment.md (#941, #1219).
  */
 
 export type ProviderName = 'arkhai' | 'marlin-tee' | 'local' | 'hetzner-systemd'

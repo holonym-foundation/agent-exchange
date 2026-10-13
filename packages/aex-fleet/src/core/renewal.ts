@@ -4,7 +4,7 @@ import { getProvider, type ProviderName } from './providers/index.js'
 import { renewIfDue, type RenewalDeps, type RenewalOutcome } from './autopay.js'
 
 /**
- * WS-D / #1256 — autopay renewal engine wiring.
+ * autopay renewal engine wiring.
  *
  * `renewAll` sweeps the fleet and, for each agent whose lease is near expiry, re-buys the next term
  * within the consented cap by reusing the existing provider lease path (Arkhai `market buy`, signed
@@ -45,7 +45,7 @@ function buildRenew(opts: RenewAllOptions) {
     if (!dep) throw new Error('no deployment recorded — cannot renew')
     const provider = getProvider(dep.provider as ProviderName, {
       durationHours: dep.leaseHours,
-      walletMode: 'waap', // renewals are signed by the agent's own WaaP wallet (Model 2)
+      walletMode: 'waap', // renewals are signed by the agent's own WaaP wallet
       bin: opts.bin
     })
     // Renewal re-locks escrow for the next term. AEX_CONTAINER_ENV_JSON signals the seller already

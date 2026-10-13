@@ -40,7 +40,7 @@ export const DeploymentStateSchema = z.object({
   lastError: z.string().optional()
 })
 
-// WS-D / #1256 — buyer autopay (Model 2). The agent's own WaaP wallet auto-buys + auto-renews its
+// buyer autopay. The agent's own WaaP wallet auto-buys + auto-renews its
 // compute lease without a human approving each tx, bounded by a spend policy the user consented to
 // at deploy. Recorded on the fleet entry so the renewal loop knows the cap and how to sign
 // non-interactively, and so a cap-hit / funds / renewal failure can `pause` (never silently drop).

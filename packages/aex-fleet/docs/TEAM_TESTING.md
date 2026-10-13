@@ -17,6 +17,7 @@ cd agent-exchange/packages/aex-fleet
 npm install && npm run build
 
 # clean demo slate (does NOT touch any real fleet):
+read -rs PASSWORD && export PASSWORD   # 12 to 64 characters; used for every agent account the dashboard creates
 AEX_FLEET_HOME=$(mktemp -d) node dist/index.js dashboard --port 3005
 ```
 Open **http://localhost:3005**. (Hard-refresh — Cmd/Ctrl-Shift-R — after any rebuild.)
@@ -25,7 +26,8 @@ Open **http://localhost:3005**. (Hard-refresh — Cmd/Ctrl-Shift-R — after any
 ```bash
 cd packages/aex-fleet
 docker build -t aex-fleet:dev .
-docker run --rm -it -p 127.0.0.1:3005:3001 -v aex-fleet-demo:/var/lib/aex-fleet aex-fleet:dev
+read -rs PASSWORD && export PASSWORD   # 12 to 64 characters
+docker run --rm -it -e PASSWORD -p 127.0.0.1:3005:3001 -v aex-fleet-demo:/var/lib/aex-fleet aex-fleet:dev
 ```
 `@human.tech/waap-cli` + the loop script are baked into the image; state persists in the
 `aex-fleet-demo` volume.
@@ -71,7 +73,7 @@ docker run --rm -it -p 127.0.0.1:3005:3001 -v aex-fleet-demo:/var/lib/aex-fleet 
 | Server-side funding (CLI treasury sweep) | **real** — via `waap-cli` |
 | Agent signup, send-tx, policy set | **real** — `waap-cli` |
 | Live balances | **real** — viem RPC |
-| **Wallet linking** ("enroll under identity") | **PREVIEW** — local stub mirroring silk#903/#904; swaps in when they merge |
+| **Wallet linking** ("enroll under identity") | **PREVIEW** — local stub mirroring the planned WaaP SDK linking API; swaps in when it ships |
 | ERC-8004 identity | **intent only** — no on-chain mint yet |
 
 See `KNOWN_ISSUES.md` for the exact swap points.

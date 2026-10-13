@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 # One-shot capability check — runs the perpetual loop briefly so the dashboard has live state,
 # exercises pause/resume, and exits clean. Use to verify the stack works end-to-end on a laptop
-# before staging on shimmer-saas.
+# before deploying it to a host.
 #
 # Usage:
-#   EMAIL_BASE=shady@holonym.id ~/.../local-capability-check.sh
+#   EMAIL_BASE=you@example.com PASSWORD='…' ./local-capability-check.sh
 #
 # Optional env:
-#   HOPS=6  PASSWORD=…  AMOUNT=0.0001  CHAIN_ID=11155111
+#   HOPS=6  AMOUNT=0.0001  CHAIN_ID=11155111
 
 set -uo pipefail
 
 EMAIL_BASE="${EMAIL_BASE:-}"
 if [ -z "$EMAIL_BASE" ]; then
   echo "Set EMAIL_BASE first, e.g.:"
-  echo "  EMAIL_BASE=shady@holonym.id $0"
+  echo "  EMAIL_BASE=you@example.com PASSWORD='…' $0"
   exit 1
 fi
+[ -z "${PASSWORD:-}" ] && { echo "PASSWORD required (12 to 64 characters, used for every agent account)" >&2; exit 1; }
 HOPS="${HOPS:-6}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

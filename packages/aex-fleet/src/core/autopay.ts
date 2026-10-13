@@ -3,7 +3,7 @@ import { FleetManager } from './FleetManager.js'
 import { runWaap } from './waap-runner.js'
 
 /**
- * WS-D / #1256 — buyer autopay (Model 2) core.
+ * buyer autopay core.
  *
  * The agent's own WaaP wallet auto-buys and auto-renews its compute lease without a human
  * approving each transaction, bounded by a spend policy the user consented to at deploy.

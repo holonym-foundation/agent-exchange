@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Perpetual round-robin ETH pass — long-running version of passing-eth-demo.sh designed for
-# hosted demos (shimmer-saas, aex, anything systemd-shaped). Trades pass-1 → pass-2 → pass-3 →
+# hosted demos (anything systemd-shaped). Trades pass-1 → pass-2 → pass-3 →
 # pass-1 forever at a slow cadence so a small initial funding lasts months. Pause and resume
 # without killing the loop via a sentinel file.
 #
@@ -10,7 +10,7 @@
 #
 # Env:
 #   EMAIL_BASE (required)   — see passing-eth-demo.sh, same shape
-#   PASSWORD                — default AexPassDemo!1234
+#   PASSWORD (required)     — 12 to 64 characters; used for every agent account
 #   DELAY                   — seconds between hops (default 300 — 5 min, so 3 hops/15 min → ~100 days on 3 ETH)
 #   AMOUNT                  — ETH per hop (default 0.0001)
 #   CHAIN_ID                — default 11155111 (Sepolia)
@@ -18,7 +18,7 @@
 #   LOG_FILE                — optional tee target (default stdout)
 #
 # Usage:
-#   EMAIL_BASE=demo@holonym.id ./perpetual-pass-loop.sh
+#   EMAIL_BASE=you@example.com PASSWORD='…' ./perpetual-pass-loop.sh
 #
 #   # pause (run anywhere with access to $AEX_FLEET_HOME):
 #   touch $AEX_FLEET_HOME/perpetual-pass.paused
@@ -33,10 +33,11 @@ set -uo pipefail
 
 EMAIL_BASE="${EMAIL_BASE:-}"
 if [ -z "$EMAIL_BASE" ]; then
-  echo "Set EMAIL_BASE first, e.g.: EMAIL_BASE=demo@holonym.id ./perpetual-pass-loop.sh" >&2
+  echo "Set EMAIL_BASE first, e.g.: EMAIL_BASE=you@example.com PASSWORD='…' ./perpetual-pass-loop.sh" >&2
   exit 1
 fi
-PASSWORD="${PASSWORD:-AexPassDemo!1234}"
+PASSWORD="${PASSWORD:-}"
+[ -z "$PASSWORD" ] && { echo "PASSWORD required (12 to 64 characters, used for every agent account)" >&2; exit 1; }
 DELAY="${DELAY:-300}"
 AMOUNT="${AMOUNT:-0.0001}"
 CHAIN_ID="${CHAIN_ID:-11155111}"

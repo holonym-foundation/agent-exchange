@@ -2,7 +2,7 @@
 # Fund a set of recipient agents from an existing tagged source pool.
 #
 # Use case: you have an existing funded fleet (e.g. tagged `pass-demo`) and want to seed a
-# brand-new fleet (e.g. the perpetual `webmaster+pass-1/2/3` agents on a hosted box) without
+# brand-new fleet (e.g. perpetual demo agents on a hosted deployment) without
 # manually round-tripping through a faucet.
 #
 # Behaviour: each source agent sends AMOUNT ETH to each recipient. So for 3 sources × 3
@@ -15,7 +15,7 @@
 # Example (seed perpetual demo from your existing pass-demo wallets):
 #   ./fund-from-fleet.sh \
 #       --from-tag pass-demo \
-#       --to webmaster-pass-1,webmaster-pass-2,webmaster-pass-3 \
+#       --to perp-1,perp-2,perp-3 \
 #       --amount 0.05 --yes
 #
 # Honors AEX_FLEET_RPC_SEPOLIA for receipt polling (matches dashboard config).

@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       bash curl jq perl ca-certificates dumb-init \
     && rm -rf /var/lib/apt/lists/*
 
-# waap-cli pinned to the same major as we test against
-RUN npm install -g @human.tech/waap-cli@1.0.2
+# waap-cli pinned to the version the session adapter is tested against (package.json)
+RUN npm install -g @human.tech/waap-cli@2.2.1
 
 # /opt/aex-fleet is the asset root that server.ts / dashboard.ts resolveAsset() falls back to.
 WORKDIR /opt/aex-fleet
