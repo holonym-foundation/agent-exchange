@@ -23,7 +23,7 @@ import {
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// Config — see https://docs.wallet.human.tech/recipes/cetus-yield-agent
+// Config — see https://docs.waap.human.tech/recipes/cetus-yield-agent
 // -----------------------------------------------------------------------------
 
 const AGENT_ID = '{{projectName}}'
@@ -80,7 +80,7 @@ const intentJournal = new IntentJournal(INTENT_FILE)
 
 // Watchdog integration — writes a PID file on startup so external supervisors
 // (systemd Type=simple + a tailer, or a bash watchdog) can detect liveness.
-// Defaults to enabled to match the dogfood deployment pattern. Set
+// Defaults to enabled so a process supervisor can detect liveness. Set
 // WRITE_PID_FILE=false to opt out (e.g. local dev where stale .pid files
 // during crashes are annoying).
 const WRITE_PID_FILE = (process.env.WRITE_PID_FILE ?? 'true').toLowerCase() !== 'false'
