@@ -6,8 +6,7 @@ This produces a plan that breaks the in/out correlation — varied (non-round, n
 jittered timing, respecting Shield's caps. It also runs the readiness checks (source != destination,
 both must be verified, amount vs caps, testnet-vs-mainnet gating).
 
-This script PLANS only. Execution (the Shield SDK deposit/withdraw via waap-cli + the in-process PXE)
-is the mainnet-gated step — see docs/specs/privacy-guard-v2.md for the integration contract.
+This script PLANS only. Execution (the Shield SDK deposit/withdraw via waap-cli) is not wired in yet.
 
 Model A: deposit from your VERIFIED source wallet -> Aztec private layer (decorrelate) -> withdraw to
 another of your VERIFIED identities. Eligibility (Passport >=20 / PoCH) is a precondition checked at
@@ -98,9 +97,8 @@ def main():
         "ready": not blockers,
         "blockers": blockers,
         "warnings": warnings,
-        "execution": ("MAINNET-GATED: execute via the Shield SDK (deposit/withdraw) using waap-cli for "
-                      "L1 Permit2 + Aztec ECDSA auth, and the in-process PXE for the private leg. See "
-                      "docs/specs/privacy-guard-v2.md. On testnet, run capped, small amounts to find wrinkles."),
+        "execution": ("NOT WIRED: execution via the Shield SDK (deposit/withdraw) using waap-cli is not "
+                      "available in this skill yet. On testnet, run capped, small amounts to find wrinkles."),
         "note": "Plan only — moves nothing. Re-screen eligibility immediately before each tranche; "
                 "never deposit==withdraw the same amount/time.",
     }, indent=2))

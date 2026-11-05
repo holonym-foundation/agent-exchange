@@ -127,13 +127,3 @@ Keyless data (GoPlus 30/min, Honeypot.is, public RPC, free GitHub feeds, Chainal
 sanctions oracle), your own MEMORY (baseline + cached feeds + watched approvals/upgrades), your own
 `waap-cli` wallet to act, your own Telegram to alert/hand-off. No keys, no AEX backend. If the
 operator later provides RPC/explorer keys you may use them, but you don't require them.
-
-## North star (spec'd separately): guard as a PWS policy webhook
-Today the Guard detects + recommends + (human-gated) acts after the fact. The structural endgame is
-to make it a **PWS policy webhook** — WaaP's roadmapped user-registered policy hook (owner Nanak,
-assigned Anmol). Every transaction passes the Guard's checks (WaaP's `riskLevel` + GoPlus + feeds +
-exposure + Permit/approval decode) and the Guard returns `ALLOW | DENY | REQUIRE_2FA` *before* the
-2PC share is released, so a malicious signature is *vetoed before it executes* — opt-in (registering
-the webhook is the opt-in), per-user, and provider-pluggable. Combined with on-chain programmable
-policy (caps/allowlists) as a trustless backstop. We build the Guard *as* a PWS provider, not as a
-bespoke enclave change. See `docs/specs/security-guard-cosigner.md`.
