@@ -20,13 +20,13 @@ Addresses are fine **only** when they are public token/contract addresses (USDC,
 | Category | Examples |
 |---|---|
 | **Secrets** | private keys, mnemonics/seed phrases, DB connection strings (DSNs), API tokens (`napi_…`, OpenRouter, Brave, TAP), passwords |
-| **Infrastructure** | box/server IPs, internal hostnames (`aex-stack`, `aex-native-scm`, `aex-signer`, `aex-registry-main`, `aex-run-forced`), managed-DB endpoint/branch names |
+| **Infrastructure** | server IPs, internal hostnames, managed-DB endpoint/branch names |
 | **Operational wallets** | any wallet address we actually operate (seller, buyer, fee/rake, admin, per-agent runtime wallets) |
 | **Internal-only content** | `deployments/`, internally-run agent instances (`agents/`), runtime image internals (`agent-base/`), `*.internal.md`, strategy/handoff/GTM docs, `.env*` |
 
 ## How this is enforced
 
-1. **`scripts/repo-guard.sh`** — fails on blocked paths, secrets, infra references, and the operational-wallet **hash denylist** (`scripts/guard/deny-address-hashes.txt` — addresses stored only as SHA-256, never cleartext).
+1. **`scripts/repo-guard.sh`** — fails on blocked paths, secrets, and two **hash denylists**: infrastructure identifiers (`scripts/guard/deny-infra-hashes.txt`) and operational wallets (`scripts/guard/deny-address-hashes.txt`). Both store SHA-256 only, never cleartext.
 2. **Pre-commit hook** — `git config core.hooksPath .githooks` runs the guard locally before every commit.
 3. **CI (`.github/workflows/guard.yml`)** — runs `gitleaks` (broad secret scan over full history) + `repo-guard.sh` on every push/PR. Make it a **required** status check.
 4. **`CODEOWNERS` + PR checklist** — human review for anything the automation can't judge (e.g. is a new address really a public contract?).

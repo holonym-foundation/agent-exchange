@@ -1,0 +1,26 @@
+# SHA-256 hashes of infrastructure identifiers that must never appear in this public
+# repo: server IP ranges, internal service hostnames, and managed-DB branch names.
+# repo-guard.sh hashes candidate tokens from tracked files and fails on a match, so
+# the identifiers themselves are never stored here in cleartext and never printed
+# in CI logs.
+#
+# Candidates are lowercase:
+#   - IP ranges: the first three octets of an IPv4 address, e.g. 203.0.113
+#   - names: every run of two or more hyphen-joined words, e.g. db-main from my-db-main-1
+#
+# To add one: printf '%s' "<value>" | sha256sum   (or shasum -a 256)
+#
+b386b16c4f72724be23a01b53b8630732c635faea5f4bf0f40dcd43cf84ff38c
+26d6e5abf40fe347c7209ba05213cba01dd041cc7f31aa69cf92a9d207817f84
+871c7126af3ee54200243c8f1028c7b61a521cb112df60c42d6797aae0857db1
+22d0fc906518c331d0a2520afaa6bc24ecb28173f4ce81e8cfb0025a678492f6
+4d7677c3683456cb5c5123fbb2e03bd3c0e4abbd4e30364877ad23c5fc823bde
+3e851458b5b58e47b41c0e0b527fde9f23a5c37acf95c9d051b977e6e844316f
+21c3bd2a4e7bf60186d31ffef29fc1425fdaa7c0d164323e3e9661460c4b1f84
+6ef02fcf7d83baac77c0c2299c97179576fe12ad3a88e35d1710deceeb812e17
+e98888c76895736665df40004c3974ca1239f7ecaa87b096f8e9b73954607b6d
+cf06e59f2fc81708bb5a59fcf3d91cf93c2f0e6adb699a24be9296e9230ec764
+33dc442f8a8c4318952dbca847f6ae1724c8b517e6cdfe32714d6817fdc64773
+32d612688480b048b93450399253e29c50b13cc8e71427d0249796184d9f431e
+14539aa202e2bdb7910c1811931826b3fbacb977d38be9aa7eb84a754a6d8026
+1846d5ee356044b7afcdf8a8c5c0d1e9b59d397b6e8ca657e814a55af9fed05f
