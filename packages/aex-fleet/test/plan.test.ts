@@ -25,6 +25,16 @@ describe('plan schema', () => {
     ).toThrow()
   })
 
+  it('requires policy.set daily limits to stay strings', () => {
+    const result = PlanSchema.safeParse({
+      version: 1,
+      createdAt: new Date().toISOString(),
+      ops: [{ op: 'policy.set', agentId: 'alpha', args: { dailyLimit: 50 } }]
+    })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues.map((issue) => issue.path)).toEqual([['ops', 0, 'args', 'dailyLimit']])
+  })
+
   it('rejects wrong version', () => {
     expect(() =>
       PlanSchema.parse({

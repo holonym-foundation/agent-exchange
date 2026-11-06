@@ -44,7 +44,7 @@
     "commander": "^12.1.0",
     "execa": "^9.5.2",
     "picocolors": "^1.1.1",
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@mysten/sui": "2.17.0",
@@ -52,7 +52,7 @@
     "tsup": "^8.0.0",
     "tsx": "^4.23.13",
     "typescript": "^5.0.4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "esbuild": "^0.28.2"

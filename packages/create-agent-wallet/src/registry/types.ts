@@ -149,9 +149,16 @@ export const ActivitySchema = z.object({
 })
 export type Activity = z.infer<typeof ActivitySchema>
 
+// UTC ISO 8601 timestamp. Zod 3 also accepted minute precision (`2026-01-01T00:00Z`), which
+// Zod 4's datetime() rejects; keep accepting it so existing registries stay valid.
+const RegistryTimestampSchema = z.union([
+  z.iso.datetime(),
+  z.iso.datetime({ precision: -1 })
+])
+
 export const RegistrySchema = z.object({
   version: z.string(),
-  generatedAt: z.string().datetime(),
+  generatedAt: RegistryTimestampSchema,
   activities: z.array(ActivitySchema)
 })
 export type Registry = z.infer<typeof RegistrySchema>
