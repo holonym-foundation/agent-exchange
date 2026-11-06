@@ -21,7 +21,7 @@ import type {
  * The integration win is to sign the escrow lock with a WaaP split-key wallet instead. Two paths:
  *   (a) Arkhai exposes a buyer-side signer hook → `market` delegates signing to waap-cli  [clean]
  *   (b) we construct + WaaP-sign the escrow tx directly
- * (a) is the ask for Levi. Until it lands, `walletMode: 'buyer-toml'` uses Arkhai's own wallet so
+ * (a) is the preferred path. Until it lands, `walletMode: 'buyer-toml'` uses Arkhai's own wallet so
  * the rest of the flow is demoable; `walletMode: 'waap'` is gated on the signer hook.
  */
 
@@ -94,9 +94,9 @@ export class ArkhaiProvider implements ComputeProvider {
     if (o.ramGbMin != null) args.push('--ram-gb-min', String(o.ramGbMin))
     if (o.diskGbMin != null) args.push('--disk-gb-min', String(o.diskGbMin))
     // Lease duration precedence: explicit option > AEX_LEASE_HOURS env > default (1h).
-    // The aex-ui deploy route forwards process.env to this process, so operators can
+    // A hosted deploy route can forward process.env to this process, so operators can
     // set a durable fleet-wide lease (e.g. 720 = 30d, the resource max) without a
-    // per-call flag. Renewal/autopay (#1256) extends beyond the lease window.
+    // per-call flag. Renewal/autopay extends beyond the lease window.
     const envHours = Number(process.env.AEX_LEASE_HOURS)
     const durationHours =
       o.durationHours ?? (Number.isFinite(envHours) && envHours > 0 ? envHours : DEFAULTS.durationHours)
@@ -111,7 +111,7 @@ export class ArkhaiProvider implements ComputeProvider {
     const notes: string[] = []
     if (this.opts.walletMode === 'waap') {
       notes.push(
-        'walletMode=waap requires Arkhai buyer signer hook (delegate `market` signing to waap-cli). Confirm with Levi; falling back to escrow signed by buyer.toml for now is NOT done here.'
+        'walletMode=waap requires Arkhai buyer signer hook (delegate `market` signing to waap-cli). Arkhai does not offer it yet, and this does NOT fall back to escrow signed by buyer.toml.'
       )
     }
 

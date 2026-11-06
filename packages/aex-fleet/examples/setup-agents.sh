@@ -4,7 +4,7 @@
 # back to login). Records each agent's EVM address into fleet.json via `aex-fleet set`.
 #
 # Usage:
-#   EMAIL_BASE=webmaster@holonym.id ./setup-agents.sh [COUNT] [PREFIX] [TAG]
+#   EMAIL_BASE=you@example.com PASSWORD='…' ./setup-agents.sh [COUNT] [PREFIX] [TAG]
 #
 # Args (all optional):
 #   COUNT   number of agents to create (default 3)
@@ -12,8 +12,8 @@
 #   TAG     tag applied to each (default "perpetual")
 #
 # Env:
-#   EMAIL_BASE (required)  e.g. webmaster@holonym.id → webmaster+pass1@holonym.id …
-#   PASSWORD               default AexPassDemo!1234
+#   EMAIL_BASE (required)  e.g. you@example.com → you+pass1@example.com …
+#   PASSWORD   (required)  12 to 64 characters; used for every agent account
 #   CHAIN                  default sepolia
 
 set -uo pipefail
@@ -23,7 +23,8 @@ EMAIL_BASE="${EMAIL_BASE:-}"
 COUNT="${1:-3}"
 PREFIX="${2:-pass}"
 TAG="${3:-perpetual}"
-PASSWORD="${PASSWORD:-AexPassDemo!1234}"
+PASSWORD="${PASSWORD:-}"
+[ -z "$PASSWORD" ] && { echo "PASSWORD required (12 to 64 characters, used for every agent account)" >&2; exit 1; }
 CHAIN="${CHAIN:-sepolia}"
 
 EMAIL_USER="${EMAIL_BASE%@*}"

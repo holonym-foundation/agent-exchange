@@ -6,10 +6,11 @@
 # terminal — its 5s auto-refresh will capture each balance change live.
 #
 # Usage:
-#   EMAIL_BASE=you@gmail.com ./passing-eth-demo.sh
+#   EMAIL_BASE=you@gmail.com PASSWORD='…' ./passing-eth-demo.sh
+#
+# Required env: EMAIL_BASE, PASSWORD (12 to 64 characters; used for every agent account)
 #
 # Optional env:
-#   PASSWORD     (default: AexPassDemo!1234)
 #   ROUNDS       (default: 3)              — number of full circles
 #   AMOUNT       (default: 0.0001)         — ETH per hop
 #   DELAY        (default: 4)              — seconds between hops (≥ dashboard refresh)
@@ -31,7 +32,8 @@ if [ -z "$EMAIL_BASE" ]; then
   echo "all of them to your real inbox; no extra signups required on your end.)"
   exit 1
 fi
-PASSWORD="${PASSWORD:-AexPassDemo!1234}"
+PASSWORD="${PASSWORD:-}"
+[ -z "$PASSWORD" ] && { echo "PASSWORD required (12 to 64 characters, used for every agent account)" >&2; exit 1; }
 ROUNDS="${ROUNDS:-3}"
 AMOUNT="${AMOUNT:-0.0001}"
 # After each send we wait for the tx receipt (so dashboard catches confirmed balance) plus a

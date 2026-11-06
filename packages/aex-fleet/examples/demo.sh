@@ -9,7 +9,7 @@
 #   5. Inspect aggregate status
 #
 # Prerequisites:
-#   - `aex-fleet` and `waap-cli` on PATH (npm install -g @human.tech/aex-fleet @human.tech/waap-cli)
+#   - `aex-fleet` and `waap-cli` on PATH (see README.md "Quick start")
 #   - Optional: AEX_FLEET_NEON_DSN_RO for live status (otherwise it degrades gracefully)
 #   - Sepolia faucet access to fund the wallets after `add`
 

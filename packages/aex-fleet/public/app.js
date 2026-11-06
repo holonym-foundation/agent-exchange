@@ -266,7 +266,7 @@ const actions = {
   async 'loop-stop'() { const r = await postJson('/api/loop/stop'); toast(r.body.ok ? '■ loop stopped' : 'stop failed', r.body.ok ? 'ok' : 'err'); refresh() },
   async 'link-all'() {
     const r = await postJson('/api/fleet/link', { all: true })
-    if (r.body.ok) toast('🔗 linked ' + r.body.linked + ' agents to your identity (preview — wires to silk#904)')
+    if (r.body.ok) toast('🔗 linked ' + r.body.linked + ' agents to your identity (preview)')
     else toast('link failed: ' + (r.body.error || 'unknown'), 'err')
     refresh()
   },
@@ -392,7 +392,7 @@ function wireCreate() {
     const r = await postJson('/api/agents/create', { emailBase: email, count })
     if (r.body.ok) {
       // Auto-enroll the new agents under the operator identity (the "linked from birth" model),
-      // if an operator anchor is set. Prototype link — wires to silk#904.
+      // if an operator anchor is set. Prototype link.
       if (state.operator && state.operator.anchorAddress) {
         const lr = await postJson('/api/fleet/link', { all: true })
         toast('created ' + (r.body.created ?? count) + ' agents' + (lr.body.ok ? ' · enrolled under your identity' : ''))

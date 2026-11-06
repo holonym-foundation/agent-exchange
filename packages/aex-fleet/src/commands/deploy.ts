@@ -8,8 +8,6 @@ import { sessionDir, ensureSessionDir } from '../core/keychain.js'
  * `aex-fleet deploy` — ship an agent onto a compute backend through the provider abstraction.
  * Default target is Arkhai (on-chain VM leasing); `--target local` runs it as a local process so
  * the whole flow is demoable without external compute. Records the deployment on the fleet entry.
- *
- * Design ref: internal-docs products/waap/prd/aex/deployment.md (#941, #1219).
  */
 export function deployCommand(): Command {
   return new Command('deploy')
