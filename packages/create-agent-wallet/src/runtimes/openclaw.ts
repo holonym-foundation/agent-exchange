@@ -7,8 +7,6 @@ import type { Vars } from '../scaffold/vars.js'
  *
  * OpenClaw conforms to the AgentSkills open standard (agentskills.io),
  * so the same SKILL.md works across Claude Code, Cursor, Hermes, etc.
- *
- * Tracking: internal-docs #417
  */
 export function openclawVars(activity: Activity, base: Vars): Vars {
   return {

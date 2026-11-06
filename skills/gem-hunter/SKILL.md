@@ -42,7 +42,7 @@ For an approved+screened gem: `gem_buy.py --chain {GEM_CHAIN} --token <addr> --u
 --slippage-bps {GEM_MAX_SLIPPAGE_BPS} --recipient <your WaaP address>`. It builds, keylessly (Uniswap
 v3 QuoterV2 for the best fee tier / 2-hop via WETH), the **approve(USDC→router)** then
 **exactInputSingle/exactInput** calldata with `amountOutMinimum` from slippage. Execute the two txs
-via `waap-cli send-tx` (2PC — no private key in the env). Rules:
+via `waap-cli send-tx` (WaaP signs; no private key in the env). Rules:
 - **Re-screen immediately before buying** (gem_screen) — reject if it flipped to `no-go`.
 - **Caps:** never spend more than `{GEM_BUY_USD}` per buy or `{GEM_MAX_USD_TOTAL}` total (track spend
   in MEMORY); abort if the quote implies worse than `{GEM_MAX_SLIPPAGE_BPS}`.

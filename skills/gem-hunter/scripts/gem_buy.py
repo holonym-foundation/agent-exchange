@@ -3,7 +3,7 @@
 
 Self-sustaining: Uniswap v3 QuoterV2 (eth_call, keyless) for the price + best fee tier, then builds
 the approve(USDC->router) + exactInputSingle/exactInput calldata. No aggregator key, no AEX backend.
-The agent executes the two txs via `waap-cli send-tx` (2PC, no private key in the env). In dry-run it
+The agent executes the two txs via `waap-cli send-tx` (WaaP signs; no private key in the env). In dry-run it
 just prints the plan and the quoted price.
 
 The script NEVER sends anything — it emits a buy plan. Execution is human-gated/dry-run-aware at the

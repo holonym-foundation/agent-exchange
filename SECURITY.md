@@ -42,13 +42,13 @@ Out of scope (report to those projects directly):
 
 ## Audit posture
 
-WaaP itself has been audited by Cure53, Hexens, Least Authority, and Halborn. See the [WaaP audit summary](https://github.com/holonym-foundation/internal-docs/blob/main/products/waap/research/audit-summary.md) for status.
+WaaP itself has been audited by Cure53, Hexens, Least Authority, and Halborn. See the [WaaP audit reports](https://docs.waap.human.tech/overview/architecture-security-model/audit-reports).
 
 Per-agent audits (when conducted) are stored in each agent's `audits/` directory in this repository, with provider, date, scope, commit hash, and report link disclosed.
 
 ## Coordination with Sui Foundation
 
-AEX agents that operate on Sui follow the [Sui Moonshot 2026 security requirements](https://github.com/holonym-foundation/internal-docs/blob/main/products/waap/research/sui-moonshot-security-requirements.md). For incidents touching Sui agents, we coordinate with Sui Foundation Security and Mysten Labs through a shared incident channel (channel coordination is in flight; contact security@holonym.id for current routing).
+AEX agents that operate on Sui follow the Sui Moonshot 2026 security requirements. For incidents touching Sui agents, contact security@holonym.id. We coordinate with Sui Foundation Security and Mysten Labs.
 
 ## Acknowledgment
 

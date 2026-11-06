@@ -49,7 +49,7 @@ Respect the recipe's policy (`CLAIM_MODE`, `CLAIM_MAX_USD`, `AGENT_DRY_RUN`, `CL
 - **CLAIM_MODE = notify** (default) or **AGENT_DRY_RUN = 1** → send the owner a Telegram message
   with the project, what's claimable, and the claim link/contract. Do not move funds.
 - **CLAIM_MODE = auto** and not dry-run and the claim cost ≤ `CLAIM_MAX_USD` → build and send the
-  claim transaction with `waap-cli` (your own MPC wallet). Then, if `CLAIM_AUTOSECURE = 1`, move the
+  claim transaction with `waap-cli` (your own WaaP wallet). Then, if `CLAIM_AUTOSECURE = 1`, move the
   proceeds to a stable to beat the dump. Report the tx.
 - **Always at least notify** — never silently miss a live claim.
 

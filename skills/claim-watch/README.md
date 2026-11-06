@@ -15,17 +15,16 @@ skills/claim-watch/
   the public Merkl API. No keys, no AEX service.
 - **What to watch** — the agent's **own MEMORY** (the opportunities it farmed + their distributor
   addresses), not a server lookup.
-- **Acting** — the agent's **own `waap-cli` MPC wallet** to claim; its **own Telegram** (Hermes
+- **Acting** — the agent's **own `waap-cli` wallet** to claim; its **own Telegram** (Hermes
   gateway) to notify. Nothing routes through AEX infra.
 
 So an agent keeps watching and claiming even if the AEX control plane is unavailable — which is the
 point: agents should not depend on AEX infra unless there's a strong reason.
 
 ## Integration (runtime)
-Bake this directory into the agent runtime image (`aex-agent-runtime` / `agent-base`) so the agent
-loads it as a skill, the same way the `waap-cli` skill is provided. The Airdrop Scout→Farmer recipe
-(`agents/autoresearch/activity.json`) Phase 3 already invokes it by path. No per-tenant config
-needed.
+Install this directory as a skill in any [AgentSkills](https://agentskills.io/)-compatible runtime
+(Claude Code, OpenClaw, Hermes Agent), alongside the `waap-cli` skill. An Airdrop Farmer runs it
+each cycle for the opportunities in its MEMORY. No per-tenant config needed.
 
 ## Optional acceleration (not required)
 If the operator sets `ETHERSCAN_API_KEY` or an Alchemy WSS URL in the agent's env, the watcher can

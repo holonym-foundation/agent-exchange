@@ -18,7 +18,7 @@ import type {
  * Settlement is ERC-20 escrow via Alkahest + ERC-8004 (example USDC on Base Sepolia).
  *
  * WaaP seam: Arkhai's `market` CLI today reads a raw private_key from ~/.config/arkhai/buyer.toml.
- * The integration win is to sign the escrow lock with a WaaP split-key wallet instead. Two paths:
+ * The integration win is to sign the escrow lock with a WaaP wallet instead. Two paths:
  *   (a) Arkhai exposes a buyer-side signer hook → `market` delegates signing to waap-cli  [clean]
  *   (b) we construct + WaaP-sign the escrow tx directly
  * (a) is the ask for Levi. Until it lands, `walletMode: 'buyer-toml'` uses Arkhai's own wallet so
@@ -122,7 +122,7 @@ export class ArkhaiProvider implements ComputeProvider {
         `${pc.bold('2.')} parse lease → escrowUid, vm_host_ip, ssh port/user`,
         `${pc.bold('3.')} rsync ${spec.source} → ${sshTarget}:~/agent`,
         `${pc.bold('4.')} ssh ${sshTarget} 'cd ~/agent && npm ci && (env ${envPreview(spec.env)} nohup node agent.js &)'`,
-        `${pc.bold('escrow')} signed by: ${this.opts.walletMode === 'waap' ? 'WaaP wallet (split-key)' : 'buyer.toml key (legacy)'}`
+        `${pc.bold('escrow')} signed by: ${this.opts.walletMode === 'waap' ? 'WaaP wallet' : 'buyer.toml key (legacy)'}`
       )
       return {
         provider: this.name,

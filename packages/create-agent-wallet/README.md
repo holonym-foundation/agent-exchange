@@ -130,7 +130,7 @@ Placeholders are used where on-chain state is required:
 
 ### Default trust model
 
-Scaffolded projects default to `supportedTrust: ["tee-attestation"]` because WaaP's 2PC signing terminates in a TEE. Activities can declare `reputation` and `crypto-economic` too in their `activity.json`.
+Scaffolded projects default to `supportedTrust: ["tee-attestation"]` because WaaP signs inside an attested enclave (TEE). Activities can declare `reputation` and `crypto-economic` too in their `activity.json`.
 
 ### What's not in v1
 
